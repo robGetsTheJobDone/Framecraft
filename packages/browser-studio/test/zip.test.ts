@@ -3,8 +3,8 @@ import {zipSync,strToU8,unzipSync} from 'fflate';
 import {MemoryFileSystem} from '@deepbench/browser-filesystem';
 import type {BaseChatModel} from '@langchain/core/language_models/chat_models';
 import {createAdSession,importAdZip,restoreAdSession} from '../src/ad-session.js';
-import {createZipFileAdapter,zipToSnapshot} from '../src/zip.js';
-import {CheckpointConflictError} from '../src/checkpoints.js';
+import {createZipFileAdapter,snapshotToZip,zipToSnapshot} from '../src/zip.js';
+import {CheckpointConflictError,checkpointSnapshot,parseCheckpoint} from '../src/checkpoints.js';
 const model={} as BaseChatModel;
 it('roundtrips raw binary assets/context through a real ZIP into an isolated conversation',async()=>{
  const storage=new MemoryFileSystem();
@@ -36,3 +36,17 @@ it('rejects traversal and unrelated ZIPs before restoring anything',async()=>{
  await expect(zipToSnapshot(new Blob([new Uint8Array(bad)]))).rejects.toThrow('Invalid');
  await expect(zipToSnapshot(new Blob([new Uint8Array(zipSync({'other.txt':strToU8('x')}))]))).rejects.toThrow();
 });
+it('roundtrips a 14 MiB recovery JSON file containing nested base64 music data',async()=>{
+ const fs=new MemoryFileSystem();
+ const recovery=JSON.stringify({schemaVersion:1,runId:'recovered',candidate:[{path:'/assets/music.wav',data:'AAAA'.repeat(14*1024*1024/4)}],cursor:{phase:'designing',messages:[]}});
+ await fs.writeFile('/project.json','{"schemaVersion":1}',{createParents:true});
+ await fs.writeFile('/Ad.tsx','export default function Ad(){return null}',{createParents:true});
+ await fs.writeFile('/runs/recovered/checkpoints/state.json',recovery,{createParents:true});
+ const checkpoint=await checkpointSnapshot(fs,'large-recovery');
+ const archive=await snapshotToZip(checkpoint);
+ const restored=await zipToSnapshot(archive);
+ const files=await parseCheckpoint(restored.snapshot,'large-recovery');
+ const file=files.find(file=>file.path==='/runs/recovered/checkpoints/state.json')!;
+ expect(atob(file.data)).toBe(recovery);
+ expect(files).toHaveLength(3);
+},30000);

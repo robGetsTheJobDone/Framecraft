@@ -7,7 +7,7 @@ import {MemoryFileSystem} from '@deepbench/browser-filesystem';
 import {createAdSession, importAdZip, restoreAdSession, type AdSessionOptions} from '../src/ad-session.js';
 import {CheckpointConflictError, UncertainToolCallError, type CheckpointAdapter} from '../src/checkpoints.js';
 const source='export default function Ad(){return <div>Recovered scene</div>}';
-const plan={concept:'Simple',scenes:[{start:0,end:8,copy:'Hi',visual:'Blue',motion:'Title',assetKeys:[]}],assets:[],nextChanges:['Layout']};
+const plan={concept:'Simple',scenes:[{id:null,componentId:null,start:0,end:8,copy:'Hi',visual:'Blue',motion:'Title',assetKeys:[]}],assets:[],nextChanges:['Layout']};
 function remoteStore(){
  let current:{snapshot:Blob;version:string}|null=null;let revision=0;
  const adapter:CheckpointAdapter={read:async()=>current,save:async(_id,snapshot,{expectedVersion})=>{if((current?.version??null)!==expectedVersion)throw new CheckpointConflictError();current={snapshot,version:String(++revision)};return {version:current.version};}};
@@ -23,7 +23,7 @@ function fixture(checkpoints?:CheckpointAdapter){
    if(!results.some(message=>message.tool_call_id==='write'))return new AIMessage({content:'',tool_calls:[{id:'write',name:'write_ad',args:{source}}]});
    return new AIMessage({content:'',tool_calls:[{id:'done',name:'finish_design',args:{}}]});
  }})} as unknown as BaseChatModel;
- const options:AdSessionOptions={projectId:'recover',adapters:{model,checkpoints,storage:new MemoryFileSystem(),render:async()=>({frames:[{format:'story',timeSeconds:1,dataUrl:'data:image/png;base64,cGl4ZWxz'}]})},tools:({session})=>[tool(async()=>{deliveries++;if(uncertain)throw new Error('Provider connection lost after accepting request');await session.filesystem.writeFile('/delivery.txt','Paid result',{createParents:true});return 'Paid result';},{name:'deliver',description:'External operation',schema:z.object({})})]};
+ const options:AdSessionOptions={projectId:'recover',initialMode:'source',adapters:{model,checkpoints,storage:new MemoryFileSystem(),render:async()=>({frames:[{format:'story',timeSeconds:1,dataUrl:'data:image/png;base64,cGl4ZWxz'}]})},tools:({session})=>[tool(async()=>{deliveries++;if(uncertain)throw new Error('Provider connection lost after accepting request');await session.filesystem.writeFile('/delivery.txt','Paid result',{createParents:true});return 'Paid result';},{name:'deliver',description:'External operation',schema:z.object({})})]};
  return {options,stats:()=>({plans,deliveries,designerCalls}),continue:()=>{interrupted=false;},makeUncertain:()=>{uncertain=true;}};
 }
 describe('durable run checkpoints',()=>{

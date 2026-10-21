@@ -22,6 +22,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@babel/parser": "7.28.5",
     "@deepbench/browser-ad-renderer": "workspace:*",
     "@deepbench/browser-deepagents": "workspace:*",
     "@deepbench/browser-filesystem": "workspace:*",

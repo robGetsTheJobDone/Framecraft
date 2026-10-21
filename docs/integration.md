@@ -62,7 +62,7 @@ Source exports `Ad({format, width, height, assets})`; React and Remotion imports
 
 ## Current boundaries
 
-- In source mode, `Ad.tsx` owns visuals; the timeline owns audio mixing and pending voiceover scripts. Video footage compositing and automatic conversion of visual timeline edits into TSX are not implemented. The legacy timeline playground (`?mode=timeline`) retains its existing video workflow.
+- Legacy source mode uses `Ad.tsx`; structured projects use scene modules and project-owned arrangement/props. Audio mixing and pending voiceover remain timeline-owned. See [scene components and libraries](scenes-and-library.md). Source-mode footage compositing and automatic decomposition of arbitrary TSX remain unsupported. The legacy timeline playground (`?mode=timeline`) retains its existing video workflow.
 - Failed compilation/rendering preserves working source. Review exhaustion returns `approved: false` and retains the best rendered candidate. Hosts should check approval before publishing.
 - `listRuns()` exposes checkpoints. `resume(runId)` continues saved execution state, including completed tool results and review progress. Interrupted provider calls may need reconciliation before recovery can continue. `cancel()` stops the active run.
 - Undo/redo cover committed agent revisions; direct file and timeline edits are not separate history entries.

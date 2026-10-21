@@ -23,6 +23,9 @@ importers:
 
   packages/browser-ad-renderer:
     dependencies:
+      '@deepbench/studio-project':
+        specifier: workspace:*
+        version: link:../studio-project
       '@mediabunny/aac-encoder':
         specifier: 1.61.6
         version: 1.61.6(mediabunny@1.61.6)
@@ -149,6 +152,9 @@ importers:
 
   packages/browser-studio:
     dependencies:
+      '@babel/parser':
+        specifier: 7.28.5
+        version: 7.28.5
       '@deepbench/browser-ad-renderer':
         specifier: workspace:*
         version: link:../browser-ad-renderer
@@ -309,8 +315,25 @@ importers:
 
 packages:
 
+  '@babel/helper-string-parser@7.29.7':
+    resolution: {integrity: sha512-Pb5ijPrZ89GDH8223L4UP8i6QApWxs04RbPQJTeWDV0/keR2E36MeKnyr6LYmUUvqRRI+Iv87SuF1W6ErINzYw==}
+    engines: {node: '>=6.9.0'}
+
+  '@babel/helper-validator-identifier@7.29.7':
+    resolution: {integrity: sha512-qehxGkRj55h/ff8EMaJ+cYhyaKlHIxqYDn682wQD7RNp9UujOQsHog2uS0r2vzr4pW+sXf90NeeayjcNaX3fFg==}
+    engines: {node: '>=6.9.0'}
+
+  '@babel/parser@7.28.5':
+    resolution: {integrity: sha512-KKBU1VGYR7ORr3At5HAtUQ+TV3SzRCXmA/8OdDZiLDBIZxVyzXuztPjfLd3BV1PRAQGCMWWSHYhL0F8d5uHBDQ==}
+    engines: {node: '>=6.0.0'}
+    hasBin: true
+
   '@babel/runtime@7.29.10':
     resolution: {integrity: sha512-NpugTzbKgGrNe45Ui32cN8vCFFMxVtP/9rtfwv0nP5FRDAjvYBxJcLVpYA9mr1jxP6cnIT7x9LUzuDTbWYYNRA==}
+    engines: {node: '>=6.9.0'}
+
+  '@babel/types@7.29.8':
+    resolution: {integrity: sha512-Vj1jF3cPfxg7OAfoI7QnVKLoILlm2JF9pnVHrX8qx7AHMiYWT+NDAA7jChlNgRS4WTLc/fD1lXLmPixluj+3Gg==}
     engines: {node: '>=6.9.0'}
 
   '@cfworker/json-schema@4.1.1':
@@ -1583,7 +1606,20 @@ packages:
 
 snapshots:
 
+  '@babel/helper-string-parser@7.29.7': {}
+
+  '@babel/helper-validator-identifier@7.29.7': {}
+
+  '@babel/parser@7.28.5':
+    dependencies:
+      '@babel/types': 7.29.8
+
   '@babel/runtime@7.29.10': {}
+
+  '@babel/types@7.29.8':
+    dependencies:
+      '@babel/helper-string-parser': 7.29.7
+      '@babel/helper-validator-identifier': 7.29.7
 
   '@cfworker/json-schema@4.1.1': {}
 

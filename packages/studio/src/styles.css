@@ -51,3 +51,54 @@
 .deepbench-studio.studio-files-mode .workspace-changes { min-height: 0; overflow: auto; }
 
 .deepbench-studio .voiceover-recorder textarea{width:100%;min-height:180px;padding:12px}.deepbench-studio .teleprompter-line{font-size:clamp(26px,4vw,44px);line-height:1.5;padding:30px 20px;margin:20px 0;background:#111715;border:1px solid #44594a;border-radius:12px;text-align:center}.deepbench-studio .voiceover-recorder audio{width:100%;margin-top:18px}.deepbench-studio .voiceover-recorder .settings-actions{display:flex;gap:10px;flex-wrap:wrap}
+
+.deepbench-studio .scene-block{position:absolute;top:3px;height:34px;min-width:3px;background:#365b4b;color:#fff;overflow:hidden;white-space:nowrap;font-size:11px}
+.deepbench-studio .scene-inspector fieldset{border:0;padding:0;display:flex;flex-direction:column;gap:10px;min-width:0}
+.deepbench-studio .scene-inspector legend{font-weight:600;margin-bottom:12px}
+.deepbench-studio .scene-inspector label{display:flex;flex-direction:column;gap:4px;font-size:12px}
+.deepbench-studio .scene-inspector input,.deepbench-studio .scene-inspector select{width:100%;box-sizing:border-box;min-height:32px}
+.deepbench-studio .scene-inspector input[type=checkbox]{width:auto;align-self:start}
+.deepbench-studio .scene-actions{display:flex;flex-wrap:wrap;gap:6px}
+.deepbench-studio .component-library{margin:16px 0;padding:16px}
+.deepbench-studio .component-library form{display:flex;flex-wrap:wrap;gap:12px;align-items:end;margin:14px 0}
+.deepbench-studio .component-library label{display:flex;flex-direction:column;gap:5px;font-size:12px}
+.deepbench-studio .component-library input,.deepbench-studio .component-library select{min-height:32px}
+.deepbench-studio .component-library small{display:block;opacity:.75}
+.deepbench-studio .component-results{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.deepbench-studio .component-results button{display:flex;flex-direction:column;gap:5px;text-align:left;padding:10px}
+.deepbench-studio .component-results img{width:100%;height:100px;object-fit:contain;background:#111;border-radius:5px}
+.deepbench-studio .component-library details{margin-top:15px}
+
+/* One library and one time axis for visuals and sound. */
+.deepbench-studio .library-tabs{display:flex;gap:4px;margin:8px 0 18px;padding:3px;background:#111517;border-radius:8px}
+.deepbench-studio .library-tabs button{flex:1;padding:8px 5px;font-size:11px;border-color:transparent;background:transparent;color:#a4afb5}
+.deepbench-studio .library-tabs button[aria-selected=true]{background:#303a36;color:#e3f0e7;border-color:#4c6256}
+.deepbench-studio .library [role=tabpanel]{min-width:0;max-height:560px;overflow:auto}
+.deepbench-studio .library [hidden]{display:none}
+.deepbench-studio .library .component-library{margin:0;padding:0;background:transparent}
+.deepbench-studio .library .component-library h2{font-size:13px}
+.deepbench-studio .library .component-library form{display:flex;flex-direction:column;align-items:stretch;gap:10px}
+.deepbench-studio .library .component-library label,.deepbench-studio .library .component-library input,.deepbench-studio .library .component-library select{width:100%;min-width:0}
+.deepbench-studio .library .component-library input[type=checkbox]{width:auto;align-self:start}
+.deepbench-studio .library .component-results{grid-template-columns:minmax(0,1fr);max-height:320px;overflow:auto}
+.deepbench-studio .library .component-library details summary{line-height:1.6;cursor:pointer}
+.deepbench-studio .library .component-library .error{margin:0 0 12px;overflow-wrap:anywhere}
+.deepbench-studio .timeline .scene-block{top:6px;height:36px;background:#365b4b;color:#eff9f2;border-color:#638575;text-align:left;padding:6px 10px;min-width:3px}
+.deepbench-studio .timeline .scene-block.selected{outline:2px solid #c1e1cc;outline-offset:-2px}
+.deepbench-studio .timeline-empty{display:flex;align-items:center;padding:6px 12px;color:#8e9b94;font-size:11px}
+.deepbench-studio .timeline .scene-inspector input,.deepbench-studio .timeline .scene-inspector select{width:100%}
+.deepbench-studio .timeline .scene-inspector input[type=checkbox]{width:auto}
+.deepbench-studio .timeline .scene-inspector label{align-items:stretch}
+.deepbench-studio .timeline .scene-inspector small{overflow-wrap:anywhere}
+.deepbench-studio .timeline>.panel-heading{flex-wrap:wrap}
+.deepbench-studio .timeline>.panel-heading>div{flex-wrap:wrap;margin-left:auto;gap:12px}
+
+.deepbench-studio .timeline .inspector{max-height:440px;overflow:auto;padding-right:4px}
+.deepbench-studio .chat-attachments{margin:10px 0;min-width:0}
+.deepbench-studio .chat form .feedback-heading{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.deepbench-studio .feedback-heading button{font-size:11px;padding:6px 8px}
+.deepbench-studio .chat form .feedback-file{display:flex;align-items:center;gap:8px;padding:6px;margin-top:6px;border:1px solid #3a4541;border-radius:6px;background:#1a211e}
+.deepbench-studio .feedback-file img{width:40px;height:40px;object-fit:contain;border-radius:3px;background:#101214}
+.deepbench-studio .feedback-file>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
+.deepbench-studio .feedback-file button{margin-left:auto;padding:3px 7px}
+.deepbench-studio .feedback-error{color:#ffb2a6;font-size:12px;line-height:1.5;margin-top:8px}

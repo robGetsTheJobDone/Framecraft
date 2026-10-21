@@ -195,7 +195,7 @@ Keep the generated JavaScript chunks, CSS, worker, and WASM available when bundl
 
 ## Current limits
 
-- `Ad.tsx` owns source-mode visuals; the timeline owns audio and pending voiceover. Visual timeline edits are not automatically translated into composition code.
+- Legacy compositions use `Ad.tsx`. Structured projects use scene modules with timeline-owned arrangement and exposed settings; audio remains on its own timeline. Automatic decomposition of arbitrary legacy source is not supported.
 - Undo/redo tracks committed agent revisions, not every manual file or timeline edit.
 - Export speed and memory use depend on composition complexity, dimensions, and browser codecs. MP4 is the default; WebM is also available.
 - Browser storage is origin-local and subject to quotas. Export a ZIP or configure checkpoints for portable persistence.
@@ -213,3 +213,7 @@ pnpm dev
 Open **http://127.0.0.1:5180**. The development playground uses a local gateway configured through `.env`; see its [setup instructions](https://github.com/robGetsTheJobDone/Framecraft/blob/main/packages/studio-playground/README.md).
 
 Run `pnpm pack:studio` to build a standalone npm tarball. The public npm name is `@framecraft/studio`; internal workspace names retain the `@deepbench` scope. The [publishing guide](https://github.com/robGetsTheJobDone/Framecraft/blob/main/PUBLISHING.md) describes releases and trusted publishing.
+
+## Scene components and brand library
+
+Build structured scenes from reusable TSX components, edit their timing/settings without rewriting code, and save pinned component versions through a library adapter. See [the scene and library guide](https://github.com/robGetsTheJobDone/Framecraft/blob/feat/scene-components-brand-library/docs/scenes-and-library.md) for contracts, migration, agent tools, and storage integration.

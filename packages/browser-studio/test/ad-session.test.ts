@@ -3,11 +3,11 @@ import {AIMessage} from '@langchain/core/messages';
 import type {BaseChatModel} from '@langchain/core/language_models/chat_models';
 import {MemoryFileSystem} from '@deepbench/browser-filesystem';
 import {createAdSession, importAdBundle} from '../src/ad-session.js';
-import {adProductionPlanSchema} from '../src/production-plan.js';
+import {adProductionPlanSchema,storedProductionPlanSchema} from '../src/production-plan.js';
 import {z} from 'zod';
 import {createSkillRegistry} from '../src/skills.js';
 const source=(round:number)=>`export default function Ad(){return <div>Round ${round}</div>}`;
-const plan={concept:'A clear ad',scenes:[{start:0,end:8,copy:'Hi',visual:'Blue',motion:'Title entrance',assetKeys:[]}],assets:[],nextChanges:['Improve layout']};
+const plan={concept:'A clear ad',scenes:[{id:null,componentId:null,start:0,end:8,copy:'Hi',visual:'Blue',motion:'Title entrance',assetKeys:[]}],assets:[],nextChanges:['Improve layout']};
 function model(needsProductionPlan=false) {
  let designs=0,reviews=0,plans=0;const evidence:unknown[]=[];
  return {stats:()=>({designs,reviews,plans,evidence}), model:{
@@ -32,7 +32,7 @@ describe('embeddable ad session',()=>{
     return designer.invoke(messages);
    }};
   }) as any;
-  const options={projectId:'raw-context',context:{files:{'Booking.tsx':'// private source body marker'}},adapters:{model:fake.model,storage:new MemoryFileSystem(),render:async()=>({frames:[{format:'story',timeSeconds:1,dataUrl:'data:image/png;base64,cGl4ZWxz'}]})}};
+  const options={initialMode:'source' as const,projectId:'raw-context',context:{files:{'Booking.tsx':'// private source body marker'}},adapters:{model:fake.model,storage:new MemoryFileSystem(),render:async()=>({frames:[{format:'story',timeSeconds:1,dataUrl:'data:image/png;base64,cGl4ZWxz'}]})}};
   const session=await createAdSession(options);
   await expect(session.workspace.write('/context/product/Booking.tsx','overwrite')).rejects.toThrow('read-only');
   await expect(session.store.filesystem.remove('/context',{recursive:true})).rejects.toThrow('read-only');
@@ -41,19 +41,30 @@ describe('embeddable ad session',()=>{
   expect(await restored.workspace.read('/context/product/Booking.tsx')).toBe('// private source body marker');
  });
 
- it('requires nullable assetId in the provider schema for generated assets',()=>{
+ it('requires every nested provider field while allowing null scene identities and asset IDs',()=>{
   const schema=z.toJSONSchema(adProductionPlanSchema) as any;
+  const visit=(node:any)=>{if(!node||typeof node!=='object')return;if(node.properties){expect(node.required).toEqual(Object.keys(node.properties));expect(node.additionalProperties).toBe(false);}for(const value of Object.values(node))if(Array.isArray(value))value.forEach(visit);else visit(value);};
+  visit(schema);
+  expect(schema.properties.scenes.items.required).toContain('id');
+  expect(schema.properties.scenes.items.required).toContain('componentId');
   expect(schema.properties.assets.items.required).toContain('assetId');
   expect(()=>adProductionPlanSchema.parse({...plan,assets:[{key:'scene',description:'Blue backdrop',action:'generate',assetId:null}]})).not.toThrow();
  });
 
+ it('normalizes old saved plans without weakening provider output validation',()=>{
+  const {id,componentId,...legacyScene}=plan.scenes[0];
+  const legacy={...plan,scenes:[legacyScene]};
+  expect(adProductionPlanSchema.safeParse(legacy).success).toBe(false);
+  expect(storedProductionPlanSchema.parse(legacy).scenes[0]).toMatchObject({id:null,componentId:null});
+ });
+
  it('forces planning and frame review, persists versions, and supports undo/redo without agent approval bypass',async()=>{
   const fake=model();let renders=0;
-  const session=await createAdSession({projectId:'test',adapters:{model:fake.model,storage:new MemoryFileSystem(),render:async()=>{renders++;return {frames:[{format:'story',timeSeconds:1,dataUrl:'data:image/png;base64,cGl4ZWxz'}]};}},review:{maxRounds:3}});
+  const session=await createAdSession({initialMode:'source' as const,projectId:'test',adapters:{model:fake.model,storage:new MemoryFileSystem(),render:async()=>{renders++;return {frames:[{format:'story',timeSeconds:1,dataUrl:'data:image/png;base64,cGl4ZWxz'}]};}},review:{maxRounds:3}});
   const original=new TextDecoder().decode(await session.workspace.readFile('/Ad.tsx'));
   const events:string[]=[];session.subscribe(e=>events.push(e.type));
   const result=await session.send('Make a clear ad');
-  expect(result.approved).toBe(true);expect(JSON.parse(await session.workspace.read('plan.json')).concept).toBe('A clear ad');expect(renders).toBe(2);expect(fake.stats().plans).toBe(2);expect(fake.stats().reviews).toBe(2);
+  expect(result.approved).toBe(true);expect(JSON.parse(await session.workspace.read('plan.json')).concept).toBe('A clear ad');expect(renders).toBe(2);expect(fake.stats().plans).toBe(1);expect(fake.stats().reviews).toBe(2);
   expect(JSON.stringify(fake.stats().evidence)).toContain('data:image/png;base64,cGl4ZWxz');
   expect(events).toContain('review');expect((await session.listRuns())[0].status).toBe('complete');
   expect(new TextDecoder().decode(await session.workspace.readFile('/Ad.tsx'))).toBe(source(2));
@@ -63,28 +74,28 @@ describe('embeddable ad session',()=>{
  });
  it('reviews the first prompt, uses targeted follow-ups without reviewer, and honors explicit review on',async()=>{
   const fake=model();const storage=new MemoryFileSystem();let renders=0;
-  const options={projectId:'followup',adapters:{model:fake.model,storage,render:async()=>{renders++;return {frames:[{format:'story',timeSeconds:1,dataUrl:'data:image/png;base64,cGl4ZWxz'}]};}}};
+  const options={initialMode:'source' as const,projectId:'followup',adapters:{model:fake.model,storage,render:async()=>{renders++;return {frames:[{format:'story',timeSeconds:1,dataUrl:'data:image/png;base64,cGl4ZWxz'}]};}}};
   let session=await createAdSession(options);
   await session.send('Create the ad');
   expect(fake.stats().reviews).toBe(2);
   session=await createAdSession(options);
   const result=await session.send('Make DEMAIS red after a second');
   expect(result.review).toBeUndefined();expect(result.approved).toBe(false);
-  expect(fake.stats().reviews).toBe(2);expect(fake.stats().plans).toBe(2);expect(renders).toBe(3);
+  expect(fake.stats().reviews).toBe(2);expect(fake.stats().plans).toBe(1);expect(renders).toBe(3);
   expect((await session.workspace.list('/runs',{recursive:true})).some(file=>file.path.endsWith('/edit-plan.json'))).toBe(true);
   await session.send('Review the edit',{review:true});
   expect(fake.stats().reviews).toBe(3);
  });
  it('escalates structural follow-ups to a full production plan',async()=>{
   const fake=model(true);
-  const session=await createAdSession({projectId:'redesign',adapters:{model:fake.model,storage:new MemoryFileSystem(),render:async()=>({frames:[{format:'story',timeSeconds:1,dataUrl:'data:image/png;base64,cGl4ZWxz'}]})}});
+  const session=await createAdSession({initialMode:'source' as const,projectId:'redesign',adapters:{model:fake.model,storage:new MemoryFileSystem(),render:async()=>({frames:[{format:'story',timeSeconds:1,dataUrl:'data:image/png;base64,cGl4ZWxz'}]})}});
   await session.send('Create',{review:false});
   await session.send('Completely redesign all scenes',{review:false});
   expect(fake.stats().plans).toBe(2);expect(fake.stats().reviews).toBe(0);
  });
  it('allows review off on the first prompt but still preserves source on failed render checks',async()=>{
   const fake=model();let fail=false;
-  const session=await createAdSession({projectId:'unchecked',adapters:{model:fake.model,storage:new MemoryFileSystem(),render:async()=>{if(fail)throw new Error('Broken render');return {frames:[{format:'story',timeSeconds:1,dataUrl:'data:image/png;base64,cGl4ZWxz'}]};}},review:{maxRounds:2}});
+  const session=await createAdSession({initialMode:'source' as const,projectId:'unchecked',adapters:{model:fake.model,storage:new MemoryFileSystem(),render:async()=>{if(fail)throw new Error('Broken render');return {frames:[{format:'story',timeSeconds:1,dataUrl:'data:image/png;base64,cGl4ZWxz'}]};}},review:{maxRounds:2}});
   await session.send('Create',{review:false});expect(fake.stats().reviews).toBe(0);
   const before=await session.workspace.read('Ad.tsx');fail=true;
   await expect(session.send('Edit',{review:false})).rejects.toThrow('No successfully rendered');
@@ -93,7 +104,7 @@ describe('embeddable ad session',()=>{
  it('commits a voiceover-only request without rewriting source or generating speech',async()=>{
   const fake=model();let turn=0;
   fake.model.bindTools=(()=>({invoke:async()=>new AIMessage({content:'',tool_calls:[turn++===0?{id:'voice',name:'request_voiceover',args:{title:'Narration',script:'More orders, less stress.',language:'en',startSeconds:0,durationSeconds:8}}:{id:'done',name:'finish_design',args:{}}]})})) as never;
-  const session=await createAdSession({projectId:'voice-only',adapters:{model:fake.model,storage:new MemoryFileSystem(),render:async()=>({frames:[{format:'story',timeSeconds:1,dataUrl:'data:image/png;base64,cGl4ZWxz'}]})}});
+  const session=await createAdSession({initialMode:'source' as const,projectId:'voice-only',adapters:{model:fake.model,storage:new MemoryFileSystem(),render:async()=>({frames:[{format:'story',timeSeconds:1,dataUrl:'data:image/png;base64,cGl4ZWxz'}]})}});
   const before=await session.workspace.read('Ad.tsx');
   const result=await session.send('Write a voiceover for the ad',{review:false});
   expect(await session.workspace.read('Ad.tsx')).toBe(before);
@@ -104,7 +115,7 @@ describe('embeddable ad session',()=>{
   expect(result.message).toContain('Click its ! clip');
  });
  it('preserves working source when all renders fail and records failed proposals',async()=>{
-  const fake=model();const session=await createAdSession({projectId:'bad',adapters:{model:fake.model,storage:new MemoryFileSystem(),render:async()=>{throw new Error('Syntax error');}},review:{maxRounds:2}});
+  const fake=model();const session=await createAdSession({initialMode:'source' as const,projectId:'bad',adapters:{model:fake.model,storage:new MemoryFileSystem(),render:async()=>{throw new Error('Syntax error');}},review:{maxRounds:2}});
   const before=await session.workspace.readFile('/Ad.tsx');await expect(session.send('Change it')).rejects.toThrow('No successfully rendered');
   expect(await session.workspace.readFile('/Ad.tsx')).toEqual(before);expect(session.busy).toBe(false);
   expect((await session.workspace.list('/runs',{recursive:true})).filter(f=>f.path.endsWith('/Ad.tsx'))).toHaveLength(2);
@@ -117,13 +128,13 @@ describe('embeddable ad session',()=>{
  });
  it('round-trips portable projects into a fresh conversation and rejects overwrites',async()=>{
   const fake=model();const storage=new MemoryFileSystem();
-  const session=await createAdSession({projectId:'original',adapters:{model:fake.model,storage}});
+  const session=await createAdSession({initialMode:'source' as const,projectId:'original',adapters:{model:fake.model,storage}});
   await session.workspace.write('Ad.tsx',source(7));
   const bundle=await session.downloadBundle();
-  const imported=await importAdBundle(bundle,{projectId:'copy',adapters:{model:fake.model,storage}});
+  const imported=await importAdBundle(bundle,{initialMode:'source' as const,projectId:'copy',adapters:{model:fake.model,storage}});
   expect(await imported.workspace.read('Ad.tsx')).toBe(source(7));
   expect(imported.skills.list()).toEqual(session.skills.list());
-  await expect(importAdBundle(bundle,{projectId:'copy',adapters:{model:fake.model,storage}})).rejects.toThrow();
+  await expect(importAdBundle(bundle,{initialMode:'source' as const,projectId:'copy',adapters:{model:fake.model,storage}})).rejects.toThrow();
  });
  it('does not overwrite an older skill version when supporting files change',async()=>{
   const skill={id:'test',version:'1',roles:['designer'] as const,instructions:'Example',files:{'example.tsx':'one'}};

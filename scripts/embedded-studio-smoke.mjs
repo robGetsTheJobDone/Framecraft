@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {fileURLToPath,pathToFileURL} from 'node:url';
-import {chromium} from '@playwright/test';
+import {chromium,expect} from '@playwright/test';
 const root=process.env.STUDIO_TEST_ROOT ?? fileURLToPath(new URL('../packages/studio-playground/',import.meta.url));
 const require=createRequire(root+'/package.json');
 const vite=await import(pathToFileURL(require.resolve('vite')).href);
@@ -121,7 +121,8 @@ try {
  await page.getByLabel('Fade in (seconds)',{exact:true}).fill('0.2');
  await page.getByLabel('Fade out (seconds)',{exact:true}).fill('0.3');
  await page.getByRole('button',{name:'Apply changes',exact:true}).click();
- await page.waitForFunction(async()=>{const p=await window.testSession.store.load();return p.tracks.find(t=>t.id==='music').clips[0].fadeOutSeconds===.3;});
+ // waitForFunction treats a Promise predicate as truthy; poll the awaited result instead.
+ await expect.poll(()=>page.evaluate(async()=>{if(window.testSession.busy)return false;const p=await window.testSession.store.load();const clip=p.tracks.find(t=>t.id==='music').clips[0];return clip.fadeOutSeconds===.3&&clip.fadeInSeconds===.2&&Math.abs(clip.gain-10**(-12/20))<1e-9;}),{timeout:120000}).toBe(true);
  const mixSettings=await page.evaluate(async()=>{const p=await window.testSession.store.load();return p.tracks.find(t=>t.id==='music').clips[0];});
  assert.ok(Math.abs(mixSettings.gain-10**(-12/20))<1e-9);
  assert.equal(mixSettings.fadeInSeconds,.2);
