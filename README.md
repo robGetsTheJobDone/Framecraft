@@ -1,5 +1,7 @@
 # Framecraft
 
+[![npm version](https://img.shields.io/npm/v/@framecraft/studio)](https://www.npmjs.com/package/@framecraft/studio)
+
 An embeddable AI video studio for React, published as `@framecraft/studio`. This repository contains the studio, browser runtime, and development playground in a pnpm workspace. Create editable React and Remotion ads, generate image assets, compose music, record voiceover, and export video locally.
 
 **Embed in your app:** See the [package README](packages/studio/README.md) for installation and examples, or the [integration guide](docs/integration.md) for adapters, skills, and recovery.

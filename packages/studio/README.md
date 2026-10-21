@@ -1,5 +1,7 @@
 # Framecraft
 
+[![npm version](https://img.shields.io/npm/v/@framecraft/studio)](https://www.npmjs.com/package/@framecraft/studio)
+
 **An embeddable AI video studio for React.**
 
 Turn a brief, brand assets, and product context into editable video ads. Framecraft plans scenes, writes React and Remotion compositions, uses generated images as assets, and reviews rendered frames. Users can refine the result through chat, edit the source, compose music, record voiceover, and export a video.
