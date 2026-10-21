@@ -1,0 +1,11 @@
+node_modules/
+dist/
+coverage/
+.DS_Store
+.env
+.env.*
+!.env.example
+
+packages/browser-ad-renderer/src/harness-code.ts
+packages/studio/portable/
+*.tgz

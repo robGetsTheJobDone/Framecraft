@@ -1,0 +1,6 @@
+.deepbench-studio .studio-code-editor { position: relative; margin-top: 8px; border: 1px solid #46534a; border-radius: 8px; overflow: hidden; }
+.deepbench-studio .studio-monaco-surface { height: 420px; min-width: 0; }
+.deepbench-studio .studio-code-editor > [role=status] { position: absolute; z-index: 2; padding: 12px; }
+/* The surrounding studio's form fields must not resize Monaco's hidden input. */
+.deepbench-studio .file-editor .monaco-editor textarea.inputarea { min-height: 0; padding: 0; border: 0; border-radius: 0; resize: none; background: transparent; outline: none; }
+.deepbench-studio .file-editor .monaco-editor input { border-radius: 0; padding: 0; }

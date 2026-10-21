@@ -1,0 +1,25 @@
+{
+  "name": "@deepbench/studio-audio",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:browser": "node test/browser/smoke.mjs"
+  },
+  "dependencies": {
+    "@deepbench/studio-project": "workspace:*"
+  }
+}

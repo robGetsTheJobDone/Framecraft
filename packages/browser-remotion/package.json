@@ -1,0 +1,13 @@
+{
+  "name": "@deepbench/browser-remotion",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": false,
+  "exports": {".": {"types": "./dist/index.d.ts", "import": "./dist/index.js"}},
+  "files": ["dist"],
+  "scripts": {"build": "tsc -p tsconfig.json", "lint": "tsc --noEmit", "test": "vitest run"},
+  "dependencies": {"@deepbench/studio-project": "workspace:*", "@remotion/media": "4.0.537", "@remotion/player": "4.0.537", "@remotion/web-renderer": "4.0.537", "remotion": "4.0.537"},
+  "peerDependencies": {"react": "^19.0.0", "react-dom": "^19.0.0"},
+  "devDependencies": {"@types/react": "^19.0.0", "@types/react-dom": "^19.0.0", "react": "^19.0.0", "react-dom": "^19.0.0"}
+}

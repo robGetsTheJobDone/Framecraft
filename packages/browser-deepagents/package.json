@@ -1,0 +1,35 @@
+{
+  "name": "@deepbench/browser-deepagents",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node build/build.mjs",
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@deepbench/browser-filesystem": "workspace:*",
+    "deepagents": "1.15.1",
+    "minimatch": "^10.2.4",
+    "langsmith": ">=0.7.1 <0.10.0"
+  },
+  "devDependencies": {
+    "@langchain/core": "^1.2.14",
+    "esbuild": "^0.28.2",
+    "@noble/hashes": "^2.0.1",
+    "path-browserify": "^1.0.1",
+    "util": "^0.12.5",
+    "process": "^0.11.10",
+    "buffer": "^6.0.3"
+  }
+}

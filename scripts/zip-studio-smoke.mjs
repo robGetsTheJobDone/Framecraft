@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import {createRequire} from 'node:module';
+import {fileURLToPath,pathToFileURL} from 'node:url';
+import {readFile} from 'node:fs/promises';
+import {chromium} from '@playwright/test';
+const root=fileURLToPath(new URL('../packages/studio-playground/',import.meta.url));
+const require=createRequire(new URL('../packages/studio-playground/package.json',import.meta.url));
+const vite=await import(pathToFileURL(require.resolve('vite')).href);
+const server=await vite.createServer({root,logLevel:'error',server:{hmr:false,host:'127.0.0.1',port:5183,strictPort:true}});
+await server.listen();const browser=await chromium.launch();
+try{
+ const page=await browser.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto('http://127.0.0.1:5183/embed-test.html');
+ await page.getByRole('button',{name:'Download ZIP',exact:true}).waitFor({timeout:60000});
+ await page.evaluate(()=>window.testSession.workspace.write('/notes.txt','ZIP roundtrip marker'));
+ const original=await page.evaluate(()=>window.testSession.projectId);
+ const downloadPromise=page.waitForEvent('download');
+ await page.getByRole('button',{name:'Download ZIP',exact:true}).click();
+ const download=await downloadPromise;assert.equal(download.suggestedFilename(),'deepbench-session.zip');
+ const path=await download.path();const bytes=await readFile(path);assert.equal(bytes.subarray(0,2).toString(),'PK');
+ await page.getByLabel('Import session ZIP').setInputFiles(path);
+ await page.waitForFunction(id=>window.testSession.projectId!==id,original);
+ assert.equal(await page.evaluate(()=>window.testSession.workspace.read('/notes.txt')),'ZIP roundtrip marker');
+ await page.getByRole('button',{name:'Download ZIP',exact:true}).waitFor();
+ const restored=await page.evaluate(()=>window.testSession.projectId);
+ await page.getByLabel('Import session ZIP').setInputFiles({name:'bad.zip',mimeType:'application/zip',buffer:Buffer.from('not a zip')});
+ await page.getByRole('alert').waitFor();assert.equal(await page.evaluate(()=>window.testSession.projectId),restored);
+ assert.deepEqual(errors,[]);
+ console.log('ZIP UI passed: real browser download, file import into new conversation, persisted files and invalid archive preserves active session.');
+} finally {await browser.close();await server.close();}

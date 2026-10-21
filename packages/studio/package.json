@@ -1,0 +1,52 @@
+{
+  "name": "@deepbench/studio",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./styles.css": "./dist/styles.css",
+    "./view": {
+      "types": "./dist/StudioView.d.ts",
+      "import": "./dist/StudioView.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "import": "./dist/node.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "sideEffects": [
+    "*.css"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json && cp src/styles.css dist/styles.css && node build/monaco.mjs",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@deepbench/browser-ad-renderer": "workspace:*",
+    "@deepbench/browser-filesystem": "workspace:*",
+    "@deepbench/browser-remotion": "workspace:*",
+    "@deepbench/browser-studio": "workspace:*",
+    "@deepbench/studio-audio": "workspace:*",
+    "@deepbench/studio-dubbing": "workspace:*",
+    "@deepbench/studio-project": "workspace:*",
+    "@langchain/core": "^1.2.14",
+    "monaco-editor": "^0.57.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}

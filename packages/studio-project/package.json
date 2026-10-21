@@ -1,0 +1,1 @@
+{"name":"@deepbench/studio-project","version":"0.0.0","private":true,"type":"module","sideEffects":false,"exports":{".":{"types":"./dist/index.d.ts","import":"./dist/index.js"}},"files":["dist"],"scripts":{"build":"tsc -p tsconfig.json","test":"vitest run","lint":"tsc --noEmit"},"dependencies":{"@deepbench/browser-filesystem":"workspace:*"}}

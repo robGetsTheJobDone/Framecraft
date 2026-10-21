@@ -1,0 +1,23 @@
+{
+  "name": "deepbench",
+  "private": true,
+  "packageManager": "pnpm@10.15.0",
+  "scripts": {
+    "dev": "pnpm --filter '@deepbench/studio-playground^...' build && pnpm --filter @deepbench/studio-playground dev",
+    "build": "pnpm -r --if-present build",
+    "lint": "pnpm -r --if-present lint",
+    "test": "pnpm -r --if-present test",
+    "test:browser": "pnpm build && node scripts/browser-smoke.mjs && node packages/studio-audio/test/browser/smoke.mjs && node scripts/studio-browser-smoke.mjs",
+    "test:playground": "pnpm --filter '@deepbench/studio-playground^...' build && node scripts/playground-smoke.mjs",
+    "test:studio-ai": "pnpm --filter '@deepbench/studio-playground^...' build && node scripts/studio-ai-smoke.mjs",
+    "test:files": "pnpm --filter '@deepbench/studio-playground^...' build && node scripts/workspace-files-smoke.mjs",
+    "test:embedded": "pnpm build && node scripts/embedded-studio-smoke.mjs",
+    "pack:studio": "pnpm build && node packages/studio/build/portable.mjs && pnpm --dir packages/studio/portable pack --pack-destination ../../../"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.64.1",
+    "esbuild": "^0.28.2",
+    "typescript": "5.9.3",
+    "vitest": "4.0.18"
+  }
+}
