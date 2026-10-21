@@ -11,7 +11,7 @@ Use an npm account with permission to publish in the `@framecraft` scope. If the
 In the npm package settings, configure a GitHub Actions trusted publisher:
 
 - Owner: `robGetsTheJobDone`
-- Repository: `DeepBench`
+- Repository: `Framecraft`
 - Workflow: `publish.yml`
 - Environment: leave empty
 - Allow direct publishing with `npm publish`

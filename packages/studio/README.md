@@ -8,7 +8,7 @@ Turn a brief, brand assets, and product context into editable video ads. Framecr
 
 The workspace, compilation, preview, audio mixing, and video export run in the browser. Your app supplies model connectivity and optional image-generation and persistence adapters.
 
-[GitHub](https://github.com/robGetsTheJobDone/DeepBench) · [Integration guide](https://github.com/robGetsTheJobDone/DeepBench/blob/main/docs/integration.md) · [Publishing guide](https://github.com/robGetsTheJobDone/DeepBench/blob/main/PUBLISHING.md)
+[GitHub](https://github.com/robGetsTheJobDone/Framecraft) · [Integration guide](https://github.com/robGetsTheJobDone/Framecraft/blob/main/docs/integration.md) · [Publishing guide](https://github.com/robGetsTheJobDone/Framecraft/blob/main/PUBLISHING.md)
 
 ## What’s included
 
@@ -167,7 +167,7 @@ For backend persistence, implement `CheckpointAdapter.read()` and `.save()` and 
 
 Interrupted runs can resume from saved execution state with `session.resume(runId)`. Completed tool results are retained. If an external operation was interrupted with an unknown outcome, recovery stops for reconciliation rather than blindly repeating it.
 
-See the [integration guide](https://github.com/robGetsTheJobDone/DeepBench/blob/main/docs/integration.md) for adapter contracts, ZIP APIs, and recovery behavior.
+See the [integration guide](https://github.com/robGetsTheJobDone/Framecraft/blob/main/docs/integration.md) for adapter contracts, ZIP APIs, and recovery behavior.
 
 ## Supply product source as context
 
@@ -208,6 +208,6 @@ pnpm install
 pnpm dev
 ```
 
-Open **http://127.0.0.1:5180**. The development playground uses a local gateway configured through `.env`; see its [setup instructions](https://github.com/robGetsTheJobDone/DeepBench/blob/main/packages/studio-playground/README.md).
+Open **http://127.0.0.1:5180**. The development playground uses a local gateway configured through `.env`; see its [setup instructions](https://github.com/robGetsTheJobDone/Framecraft/blob/main/packages/studio-playground/README.md).
 
-Run `pnpm pack:studio` to build a standalone npm tarball. The public npm name is `@framecraft/studio`; internal workspace names retain the `@deepbench` scope. The [publishing guide](https://github.com/robGetsTheJobDone/DeepBench/blob/main/PUBLISHING.md) describes releases and trusted publishing.
+Run `pnpm pack:studio` to build a standalone npm tarball. The public npm name is `@framecraft/studio`; internal workspace names retain the `@deepbench` scope. The [publishing guide](https://github.com/robGetsTheJobDone/Framecraft/blob/main/PUBLISHING.md) describes releases and trusted publishing.
