@@ -12,7 +12,9 @@ const studioManifest=manifests.find(m=>m.name==='@deepbench/studio');
 const dir='packages/studio/portable';await mkdir(dir,{recursive:true});
 // Keep the output directory inode intact for terminals opened here.
 for (const entry of await readdir(dir)) await rm(resolve(dir,entry),{recursive:true,force:true});
-const browserBuild=await build({entryPoints:{index:'packages/studio/src/index.tsx'},outdir:dir,chunkNames:'[name]-[hash]',splitting:true,minify:true,keepNames:true,metafile:true,legalComments:'linked',bundle:true,format:'esm',platform:'browser',target:'es2022',external:['react','react/*','react-dom','react-dom/*'],loader:{'.ttf':'file'},define:{'process.env.NODE_ENV':'"production"'}});
+// fflate serializes functions into workers. Name-preservation helpers injected
+// inside those functions are outside the serialized dependency graph.
+const browserBuild=await build({entryPoints:{index:'packages/studio/src/index.tsx'},outdir:dir,chunkNames:'[name]-[hash]',splitting:true,minify:true,keepNames:false,metafile:true,legalComments:'linked',bundle:true,format:'esm',platform:'browser',target:'es2022',external:['react','react/*','react-dom','react-dom/*'],loader:{'.ttf':'file'},define:{'process.env.NODE_ENV':'"production"'}});
 await writeFile('packages/studio/dist/portable-meta.json',JSON.stringify(browserBuild.metafile));
 // Keep Node filesystem imports isolated behind the optional /node subpath.
 await build({entryPoints:['packages/studio/src/node.ts'],outfile:dir+'/node.js',bundle:true,format:'esm',platform:'node',target:'node22',minify:true,legalComments:'inline'});
