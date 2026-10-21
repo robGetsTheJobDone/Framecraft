@@ -1,6 +1,8 @@
-# DeepBench
+# Framecraft
 
-A browser-first AI video studio built as pluggable TypeScript packages in a pnpm workspace. Create editable React and Remotion ads, generate image assets, compose music, record voiceover, and export video locally.
+An embeddable AI video studio for React, published as `@framecraft/studio`. This repository contains the studio, browser runtime, and development playground in a pnpm workspace. Create editable React and Remotion ads, generate image assets, compose music, record voiceover, and export video locally.
+
+**Embed in your app:** See the [package README](packages/studio/README.md) for installation and examples, or the [integration guide](docs/integration.md) for adapters, skills, and recovery.
 
 **Run the studio:** `pnpm install`, then `pnpm dev`. Open **http://127.0.0.1:5180**. For real AI, copy `.env.example` to `.env`, set `OPENAI_API_KEY`, and restart. Without a key it starts in demo mode. The agent can generate scene images for Remotion and request voiceover scripts for timeline review. See [playground instructions](packages/studio-playground/README.md).
 

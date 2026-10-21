@@ -1,193 +1,186 @@
-# Embeddable browser studio
+# Framecraft
 
-React 19 UI plus a browser-local workspace, TSX compiler, isolated Remotion preview, image assets, audio mixing, voiceover scripts, and a plan → design → render loop with configurable visual review.
+**An embeddable AI video studio for React.**
 
-## Run and install
+Turn a brief, brand assets, and product context into editable video ads. Framecraft plans scenes, writes React and Remotion compositions, uses generated images as assets, and reviews rendered frames. Users can refine the result through chat, edit the source, compose music, record voiceover, and export a video.
 
-Run `pnpm dev`, then open http://localhost:5180/?mode=ad for the source studio. The default URL opens the source studio; `?mode=timeline` opens the legacy timeline playground. Only the playground gateway reads the root `.env`; the package has no server dependency.
+The workspace, compilation, preview, audio mixing, and video export run in the browser. Your app supplies model connectivity and optional image-generation and persistence adapters.
 
-Run `pnpm pack:studio` to build `framecraft-studio-0.1.0.tgz`. In another project, run `pnpm add /absolute/path/to/framecraft-studio-0.1.0.tgz`. The artifact contains bundled workspace JavaScript, local declarations, CSS, and esbuild WASM, with no workspace-protocol dependencies. React and React DOM are host peers. Mount client-side using a browser bundler such as Vite; SSR is not supported.
+[GitHub](https://github.com/robGetsTheJobDone/DeepBench) · [Integration guide](https://github.com/robGetsTheJobDone/DeepBench/blob/main/docs/integration.md) · [Publishing guide](https://github.com/robGetsTheJobDone/DeepBench/blob/main/PUBLISHING.md)
+
+## What’s included
+
+- **Editable compositions:** React, Remotion, Tailwind, image assets, multiple aspect ratios, and live preview.
+- **Design and review:** configurable planner, designer, and reviewer roles, versioned skills, rendered-frame feedback, and recoverable revisions.
+- **Music and voiceover:** a composer agent with 24 sample-free synth presets, editable scores and MIDI, plus a line-by-line recording teleprompter.
+- **Timeline mixing:** volume in dB, mute, fades, and the same audio mix in preview and export.
+- **An inspectable workspace:** Monaco file editor, asset previews, activity updates, and optional file watching.
+- **Portable sessions:** IndexedDB storage, session ZIP download/import, checkpoint adapters, and interrupted-run recovery.
+- **Local video export:** MP4 or WebM with progress and cancellation, subject to browser codec support.
+
+## Install
+
+```sh
+npm install @framecraft/studio react@^19 react-dom@^19
+```
+
+Use a client-side React 19 application with a browser bundler such as Vite. Server-side rendering is not supported. Microphone recording and browser video encoding require HTTPS or localhost and browser support.
+
+## Mount the studio
+
+This Vite example takes a model adapter from your application. The required `model` is a LangChain chat model supporting tool calls, structured output, vision, and cancellation. The package does not include credentials or a hosted AI endpoint.
 
 ```tsx
-import {Studio} from '@framecraft/studio';
+import {Studio, type StudioAdapters} from '@framecraft/studio';
 import '@framecraft/studio/styles.css';
+import wasmURL from '@framecraft/studio/esbuild.wasm?url';
 
-<Studio
-  projectId="campaign-123"
-  initialBrief="An eight-second product launch"
-  formats={[{id: 'story', width: 1080, height: 1920}]}
-  adapters={{model: myLangChainModel, imageGeneration: myImages, speech: mySpeech}}
-  review={{maxRounds: 6, minScore: 8.5, keepBestVersion: true}}
-  onExport={({blob, format, mediaType}) => saveToMyApp(blob, format, mediaType)}
-/>
-```
-
-The model must support tool calling, structured output, vision, and cancellation. Hosts supply provider transport through adapters; the package does not read environment variables or embed a shared API key. Keep adapter instances stable across renders. `projectId` isolates conversations in IndexedDB; `adapters.storage` replaces persistence. If the bundler does not copy WASM automatically, import `@framecraft/studio/esbuild.wasm?url` (Vite) and pass it as `wasmURL`.
-
-## Session, roles, and skills
-
-```ts
-import {createAdSession, adDesignSkills} from '@framecraft/studio';
-
-const session = await createAdSession({
-  projectId: 'campaign-123',
-  adapters: {model},
-  skills: [...adDesignSkills(), {
-    id: 'my-brand', version: '1.0.0',
-    roles: ['planner', 'designer', 'reviewer'],
-    instructions: 'Use our approved logo. Keep headlines editable.',
-    files: {'examples/heading.tsx': headingExample},
-  }],
-  agents: {
-    planner: {instructions: planningInstructions},
-    designer: {model: designerModel, instructions: designInstructions},
-    reviewer: {model: reviewerModel, instructions: reviewInstructions},
-  },
-});
-session.subscribe(event => console.log(event));
-const result = await session.send('Create the launch video');
-console.log(result.approved, result.review);
-const source = await session.workspace.read('Ad.tsx');
-await session.undo();
-await session.redo();
-const movie = await session.export({format: 'story', type: 'webm'});
-const bundle = await session.downloadBundle();
-```
-
-Mount `AdStudio` with an existing session, or use `StudioView` for the lower-level timeline UI. `skills` replaces defaults. `adDesignSkills()` supplies adapted reference design/review/image instructions; `pierogiBrandSkill()` is optional. Skills and examples live under `/skills/id/version/`. `session.skills.replace(id, newVersion)` requires immutable versions; runs pin their instructions.
-
-`tools(context)` supplies additional LangChain tools with a candidate session and abort signal. Use its workspace for changes. Names cannot override built-ins. `checks` adds deterministic review failures. The reviewer switch starts on for the first prompt and off for follow-ups; switch it on before any send to request review. The designer cannot bypass enabled review. Headless callers can use `session.send(prompt, {review: true})` or `{review: false}`; omitted defaults to the first-message rule. Render validation and deterministic checks run even with review off. Unreviewed results return `approved: false` and no review score. Follow-ups use a targeted edit plan against the current source and production plan; structural redesigns request a full plan. The reviewer sees actual frames at 10%, 35%, 60%, and 85% in each format; this does not prove every frame or audio quality.
-
-Source exports `Ad({format, width, height, assets})`; React and Remotion imports, Tailwind, and inline styles are supported. Generated images persist as workspace assets and are supplied by ID as local data URLs.
-
-## Current boundaries
-
-- In source mode, `Ad.tsx` owns visuals; the timeline owns audio mixing and pending voiceover scripts. Video footage compositing and automatic conversion of visual timeline edits into TSX are not implemented. The legacy timeline playground (`?mode=timeline`) retains its existing video workflow.
-- Failed compilation/rendering preserves working source. Review exhaustion returns `approved: false` and retains the best rendered candidate. Hosts should check approval before publishing.
-- `listRuns()` exposes checkpoints. `resume(runId)` starts another bounded run from the committed project and saved feedback; it does not resume an interrupted model turn. `cancel()` stops the active run.
-- Undo/redo cover committed agent revisions; direct file and timeline edits are not separate history entries.
-- `downloadBundle()` includes source, assets, skills, conversation, and reviews. `importAdBundle(blob, options)` imports into an empty conversation. Supply adapters again; credentials are not serialized.
-- Frame-by-frame export can be slow and memory intensive. Codec availability varies by browser. WebM in Chromium is the tested path; MP4/AAC needs browser encoder support.
-- Generated code runs in an opaque iframe with network denied. Encoding and adapters run in the host. There are no server jobs or Chromium service, but generation still uses the host's provider services.
-
-## Verification
-
-Run `pnpm test`, `pnpm lint`, and `pnpm test:embedded`. The embedded smoke test uses deterministic models and real browser compilation, rendered frames, and MP4/WebM export. It checks CSS isolation, sandbox attributes, and reviewer controls without spending provider credits. Real-model design quality is not tested by these fixtures.
-
-The chat panel streams public assistant text and tool progress into Agent activity. Source mode also shows production-plan and rendered-review summaries. Raw reasoning blocks and tool arguments are not displayed. Activity is scoped to the current browser session; final chat and run records persist.
-
-Video export defaults to MP4 (H.264/AAC). Choose WebM if the browser lacks MP4 encoding support. Export shows percentage progress, supports cancellation, starts a download, and retains a download link.
-
-The designer can delegate music requests to a separate composer using `compose_music` and revise an existing soundtrack using `revise_music`. Supply `music: {model, instructions}` to customize that agent (defaults to the shared model). Eight procedural instruments require no sample library. Scores, MIDI, and synthesized WAV are saved under `/music`; the WAV is added to the music track and included in preview/export. Revisions keep old assets and replace the soundtrack clip. Download MIDI from Files, or edit score JSON and ask the agent to revise that score. Visual review inspects frames, not musical quality.
-
-Example prompts: “Compose an upbeat eight-second pluck and bass soundtrack, with a final bell accent”; “Make the bass softer and the pluck less bright, keeping the rhythm.”
-
-Files replaces the studio with a full-height collapsible file tree and code editor, opening `Ad.tsx` by default when available. Watch changes is a separate screen: monitoring is opt-in, manual refresh remains available, and stopping watching stops repeated workspace scans. Unsaved edits block navigation until saved or discarded.
-
-Files uses a locally bundled Monaco editor with syntax highlighting, line numbers, search, undo/redo, and Cmd/Ctrl-S. Revision/history files remain read-only; stale-file conflicts still require an explicit reload. Binary files such as MIDI can be downloaded, and audio/image files retain their previews. Monaco and its worker load without a CDN.
-
-Pending `!` voiceover clips open a microphone teleprompter, not AI speech generation. Edit the script, record each line, listen/retake, then add recordings. Lines are stored as WAV assets and consecutive audio clips within the original request slot. Overlong takes must be rerecorded or the slot extended; they are never silently truncated. Microphone access is requested only on Record; closing stops microphone tracks and discards unapplied takes.
-
-Select an audio or video clip in the timeline to edit **Volume (dB)**, **Fade in (seconds)** and **Fade out (seconds)**, then Apply changes. Volume ranges from -60 to +36 dB relative to the source; 0 dB is unity, and mute provides silence. Fades cannot overlap or exceed the clip duration. Preview, audio export and video export share the same mix.
-
-Agents use `set_audio_clip` with `clipId`, nullable `volumeDb`, `fadeInSeconds`, `fadeOutSeconds` and `muted`; null preserves a setting. For example: “Set the music to -12 dB, fade in over 0.5 seconds, and fade out over the final second.” This edits the mix without regenerating the soundtrack.
-
-## Remote checkpoints and recovery
-
-An optional `adapters.checkpoints` adapter stores a portable session snapshot. The snapshot contains conversation, workspace/assets, skills, history and interrupted-run state. Credentials and model instances are supplied by the host each time; they are not serialized.
-
-```ts
-import {createAdSession, restoreAdSession, type CheckpointAdapter} from '@framecraft/studio';
-
-const checkpoints: CheckpointAdapter = {
-  async read(projectId) {
-    // Retrieve from your authorized backend, S3 or R2 integration.
-    // Return null when absent, otherwise {snapshot: Blob, version: string}.
-    return backend.read(projectId);
-  },
-  async save(projectId, snapshot, {expectedVersion, signal}) {
-    // Atomically reject if the stored version differs from expectedVersion.
-    // null means "create only if absent"; return the new opaque version.
-    return backend.save(projectId, snapshot, {expectedVersion, signal});
-  },
+type VideoEditorProps = {
+  projectId: string;
+  adapters: StudioAdapters;
 };
-const options = {projectId:'ad-123', adapters:{model, checkpoints}};
-let session = await createAdSession(options);
-await session.save();
 
-// On another visit/device, hydrate local storage from the remote snapshot.
-session = await restoreAdSession(options);
-await session.resume(); // Continue the interrupted run, when one is available.
+export function VideoEditor({projectId, adapters}: VideoEditorProps) {
+  return (
+    <Studio
+      projectId={projectId}
+      adapters={adapters}
+      wasmURL={wasmURL}
+      initialBrief="Create a playful eight-second ad for a hair dye brand."
+      durationSeconds={8}
+      formats={[{id: 'story', width: 1080, height: 1920}]}
+      review={{maxRounds: 6, minScore: 8.5, keepBestVersion: true}}
+      onExport={({blob, format, mediaType}) => {
+        // Optional: upload the exported Blob to your application.
+        console.log({bytes: blob.size, format, mediaType});
+      }}
+    />
+  );
+}
 ```
 
-The adapter must enforce version comparison at the storage boundary, using a transaction or conditional object write. A read-then-unconditional-write sequence is not safe. This package defines the adapter contract; it does not embed cloud credentials or ship provider SDKs. A snapshot is currently a bounded JSON blob containing base64 assets, not incremental asset synchronization.
+Keep adapter instances stable across renders. Each `projectId` has its own conversation and workspace. `initialBrief` seeds the project; users send their request through the chat to start generation.
 
-With a checkpoint adapter configured, run boundaries save automatically. Call save() after manual timeline/file edits when you want to persist those too. session.restore() replaces local state and returns a fresh session instance; always use its return value.
+Use the `onReady(session)` callback to access the session. `onEvent(event)` receives assistant text, tool activity, review updates, and export progress. Raw reasoning is not exposed.
 
-Recovery resumes saved execution state rather than sending the original prompt again. Completed tool results are retained. If an image/music/custom tool was in flight at interruption and its outcome is unknown, automatic replay is blocked: reconcile its outcome before retrying. Restoring does not guarantee provider-side exactly-once execution.
+## Bring your integrations
 
-## Product source context from Node or Vite
+| Adapter | Purpose |
+| --- | --- |
+| `model` | Required LangChain chat model for the agent workflow. |
+| `imageGeneration` | Generate image assets for use inside compositions. |
+| `storage` | Replace the default browser filesystem. |
+| `checkpoints` | Save and restore complete session snapshots through your backend. |
+| `speech` | Optional speech generation for the separate dubbing workflow. Manual recording does not require it. |
+| `render` | Replace the renderer while providing real frames for review. |
 
-The optional Node entry point reads local files without pulling Node APIs into the browser bundle:
+Your app owns provider authentication. Shared provider credentials belong on your backend. Framecraft’s browser runtime does not require a rendering server; model and image requests still use the services supplied by your adapters.
+
+## Use the session without the UI
 
 ```ts
-// Node/build script: deliver this serializable map to your browser app.
-import {loadContextFiles} from '@framecraft/studio/node';
-const productFiles = await loadContextFiles({
-  root:'./src',
-  include:['**/*.{tsx,ts,css}', '**/README.md'],
-  exclude:['**/*.test.*'],
-});
+import {createAdSession, type StudioAdapters} from '@framecraft/studio';
+import wasmURL from '@framecraft/studio/esbuild.wasm?url';
+
+export async function createAd(adapters: StudioAdapters) {
+  const session = await createAdSession({
+    projectId: crypto.randomUUID(),
+    adapters,
+    wasmURL,
+    durationSeconds: 8,
+    formats: [{id: 'story', width: 1080, height: 1920}],
+  });
+
+  const result = await session.send('Create a colorful hair dye ad.', {
+    review: true,
+  });
+  console.log(result.approved, result.review);
+
+  // Follow-ups edit the existing composition.
+  await session.send('Make the final headline red.', {review: false});
+
+  const source = await session.workspace.read('/Ad.tsx');
+  const video = await session.export({format: 'story', type: 'mp4'});
+  const archive = await session.downloadZip();
+  return {session, source, video, archive};
+}
 ```
 
-Or let Vite supply raw source directly:
+Mount `<AdStudio session={session} />` to add the UI to an existing session. `session.undo()` and `session.redo()` navigate committed agent revisions; `session.cancel()` stops the active run.
+
+## Skills and review
+
+Default skills cover React composition, Remotion animation, image direction, and visual review. Add brand-specific instructions while keeping those defaults:
 
 ```ts
-const productFiles = import.meta.glob('/src/product/**/*.{tsx,ts,css}', {
-  query:'?raw', import:'default', eager:true,
-}) as Record<string,string>;
+import {adDesignSkills, type StudioSkill} from '@framecraft/studio';
 
-const session = await createAdSession({
-  projectId:'ad-123',
-  adapters:{model},
-  context:{files:productFiles, namespace:'product'},
-});
+const brandSkill: StudioSkill = {
+  id: 'brand',
+  version: '1.0.0',
+  roles: ['planner', 'designer', 'reviewer'],
+  instructions: 'Keep headlines editable. Preserve logo proportions.',
+};
+
+const skills = [...adDesignSkills(), brandSkill];
+// Pass `skills` to Studio or createAdSession().
 ```
 
-References appear under `/context/product/` and are read-only in Files and the agent workspace. Source is reference data, not executable imports or trusted agent instructions. Existing contents are pinned; use a new namespace or project when changing context. Saved snapshots include these files, so the resumed agent sees the same reference material.
+Supplying `skills` replaces the defaults, so include `adDesignSkills()` when extending them. Each role can also have its own model, instructions, and skills through `agents`.
 
-Defaults exclude environment/credential/key files, dependency directories and build output; the Node loader skips symlinks and rejects binary/non-UTF-8 input. Limits are 1,000 files, 512 KiB per file and 10 MiB total, with lower limits available in the Node loader. Filename exclusions do not detect secrets embedded inside ordinary source files; choose the input directory intentionally.
+Review defaults to **on for the first message, off for follow-ups**, with a UI toggle and a per-send override. When enabled, the harness requires review; the designer cannot skip it. Compilation, rendering, and deterministic checks still run with review off. Visual review samples frames; it does not verify every frame or assess musical quality.
 
-## Session ZIP files
+## Music, recording, and mixing
 
-The studio header offers **Download ZIP** and **Import ZIP**. Import creates a separate conversation; it never overwrites the open project. A ZIP contains `deepbench.json` and raw `workspace/` files, including source, context, assets, conversation, history and run checkpoints. Imported interrupted runs can be continued with **Resume interrupted run**. Automatic replay restrictions for uncertain operations still apply. The compressed archive and total expanded workspace are each limited to 128 MiB.
+Ask the agent to compose a soundtrack or revise its instruments while preserving the notes. Scores, MIDI, and synthesized WAV files remain in the workspace. Music clips play with the composition and are mixed into exports.
 
-Programmatic use:
+Voiceover requests appear as pending **!** clips. Click one to edit the script, record each line, listen, and retake before adding recordings to the timeline. This workflow records the user’s voice.
+
+Select an audio clip to adjust volume and fades, or ask: “Set the music to -12 dB, fade in over half a second, and fade out over the final second.” Mix changes do not require regenerating the soundtrack.
+
+## Save, restore, and resume
+
+**Download ZIP** packages the files, assets, conversation, skills, revisions, and run checkpoints. **Import ZIP** creates a separate conversation. Supply model adapters again after restore; credentials are not serialized.
+
+For backend persistence, implement `CheckpointAdapter.read()` and `.save()` and pass it as `adapters.checkpoints`. Your backend can store snapshots in S3, R2, or another store. Saves must enforce the expected version atomically; provider-specific cloud adapters are not bundled.
+
+Interrupted runs can resume from saved execution state with `session.resume(runId)`. Completed tool results are retained. If an external operation was interrupted with an unknown outcome, recovery stops for reconciliation rather than blindly repeating it.
+
+See the [integration guide](https://github.com/robGetsTheJobDone/DeepBench/blob/main/docs/integration.md) for adapter contracts, ZIP APIs, and recovery behavior.
+
+## Supply product source as context
+
+Pass selected files as read-only context so the agent can understand your product:
+
 ```ts
-const zip = await session.downloadZip(); // Blob; trigger a download in your UI
-const restored = await importAdZip(zipFile, {
-  ...options, projectId: crypto.randomUUID(),
-});
-await restored.resume(runId); // only if there is an interrupted run
+import productSource from './Product.tsx?raw';
+
+const context = {
+  files: {'Product.tsx': productSource},
+  namespace: 'product',
+};
+// Pass `context` to Studio or createAdSession().
 ```
 
-For the persistence-adapter interface:
-```ts
-const files = createZipFileAdapter();
-const session = await createAdSession({
-  ...options, adapters: {...options.adapters, checkpoints: files},
-});
-await session.save();
-const zip = await files.exportZip(session.projectId);
+The optional `@framecraft/studio/node` entry point exports `loadContextFiles()` for loading selected files in Node. Files are reference material, not executable plugin imports. Context travels with saved sessions; include only files intended for the agent and archive.
 
-// Later: use a fresh adapter, import the user-selected ZIP, then restore.
-const uploaded = createZipFileAdapter();
-const projectId = await uploaded.importZip(zipFile);
-const restored = await restoreAdSession({
-  ...options, projectId,
-  adapters: {...options.adapters, checkpoints: uploaded},
-});
+## Current limits
+
+- `Ad.tsx` owns source-mode visuals; the timeline owns audio and pending voiceover. Visual timeline edits are not automatically translated into composition code.
+- Undo/redo tracks committed agent revisions, not every manual file or timeline edit.
+- Export speed and memory use depend on composition complexity, dimensions, and browser codecs. MP4 is the default; WebM is also available.
+- Browser storage is origin-local and subject to quotas. Export a ZIP or configure checkpoints for portable persistence.
+- Generated compositions run in an isolated iframe with network denied. Host adapters handle external services.
+
+## Develop locally
+
+From the repository root:
+
+```sh
+pnpm install
+pnpm dev
 ```
-This adapter stages snapshots in memory; they become portable/durable when downloaded. It does not automatically download at every checkpoint and does not upload anything to a server. Keep the normal IndexedDB workspace for browser-local durability. Supply model/credentials again when restoring. A host using controlled conversation lists can use `Studio.onImported(session)` to add and select the new conversation; `AdStudio` hosts supply `onImportZip(file)` to replace their session instance.
 
-The published npm package is `@framecraft/studio`. The private source workspace retains its internal `@deepbench/studio` name.
+Open **http://127.0.0.1:5180**. The development playground uses a local gateway configured through `.env`; see its [setup instructions](https://github.com/robGetsTheJobDone/DeepBench/blob/main/packages/studio-playground/README.md).
+
+Run `pnpm pack:studio` to build a standalone npm tarball. The public npm name is `@framecraft/studio`; internal workspace names retain the `@deepbench` scope. The [publishing guide](https://github.com/robGetsTheJobDone/DeepBench/blob/main/PUBLISHING.md) describes releases and trusted publishing.
