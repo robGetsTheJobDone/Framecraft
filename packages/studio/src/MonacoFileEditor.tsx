@@ -2,7 +2,7 @@ import {useEffect, useRef, useState} from 'react';
 import type {editor} from 'monaco-editor';
 import './monaco.css';
 
-type Props = {path: string; value: string; readOnly: boolean; onChange(value: string): void; onSave(): void};
+type Props = {path: string; value: string; readOnly: boolean; onChange(value: string): void; onSave(value: string): void};
 const languageFor = (path: string) => {
   const extension = path.split('.').at(-1)?.toLowerCase();
   return ({ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript', md: 'markdown', json: 'json', css: 'css', html: 'html', yaml: 'yaml', yml: 'yaml'} as Record<string, string>)[extension ?? ''] ?? 'plaintext';
@@ -29,7 +29,7 @@ export function MonacoFileEditor(props: Props) {
       });
       instance.current = editor;
       const change = editor.onDidChangeModelContent(() => latest.current.onChange(editor.getValue()));
-      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => latest.current.onSave());
+      editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => latest.current.onSave(editor.getValue()));
       cleanup = () => {change.dispose(); editor.dispose(); model.dispose(); if (instance.current === editor) instance.current = undefined;};
       setStatus('');
     }).catch(error => {if (!disposed) setStatus(`Code editor could not load: ${error instanceof Error ? error.message : String(error)}`);});

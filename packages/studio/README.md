@@ -185,6 +185,8 @@ const context = {
 
 The optional `@framecraft/studio/node` entry point exports `loadContextFiles()` for loading selected files in Node. Files are reference material, not executable plugin imports. Context travels with saved sessions; include only files intended for the agent and archive.
 
+MP4 export uses native AAC when available and lazy-loads Mediabunny’s WASM AAC encoder otherwise. H.264 video encoding still requires browser support; WebM is also available.
+
 ## Browser loading
 
 The npm build is minified and preserves dynamic imports. Monaco loads when Files is opened, Tone loads when synthesizing music, and the composition renderer loads on its first use. Optional encoder chunks load as needed. The compiler WASM is shipped locally and loaded when compiling a composition. Mounting the studio starts a preview, so rendering and compilation are needed at that point.

@@ -28,4 +28,4 @@ Publishing a release runs build, tests, portable bundle validation and a browser
 
 Run **Publish studio to npm → Run workflow** for validation only; manual runs do not publish. Locally, use `pnpm pack:studio` followed by `node scripts/check-portable.mjs`. Generated declarations are included in the npm artifact for consumers, but remain excluded from Git.
 
-Release validation uses a GitHub-hosted macOS runner because the full audio/video smoke test requires AAC encoding, which is unavailable in standard Linux Chromium. WebM remains available for browsers without AAC.
+Release validation uses GitHub-hosted Linux Chromium, exercising the lazy-loaded Mediabunny software AAC encoder when native AAC is unavailable. MP4 still requires H.264 video encoding support.

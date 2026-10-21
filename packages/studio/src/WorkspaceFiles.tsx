@@ -92,15 +92,15 @@ export function WorkspaceFiles({session, files, busy, target, refresh, onDirtyCh
   }, [session, path, signature, reload]);
   const choose = (next: string) => {if (dirty) {setError('Save or discard your edits before opening another file.'); return;} setPath(next);};
   const discard = () => {dirtyRef.current = false; setDraft(original); setReload(n => n + 1);};
-  const save = async () => {
-    if (!dirty || !loaded?.editable || busy || saving) return;
+  const save = async (content = draft) => {
+    if (content === original || !loaded?.editable || busy || saving) return;
     setSaving(true); setError('');
     try {
       if (path === '/project.json') {
-        const project: unknown = JSON.parse(draft); assertValidProject(project);
+        const project: unknown = JSON.parse(content); assertValidProject(project);
         await session.store.save(project, {expectedProjectJson: JSON.stringify(JSON.parse(original))});
-      } else await session.filesystem.writeFile(path, draft, {expectedContent: original});
-      setOriginal(draft); dirtyRef.current = false; refresh(); setReload(n => n + 1);
+      } else await session.filesystem.writeFile(path, content, {expectedContent: original});
+      setDraft(content); setOriginal(content); dirtyRef.current = false; refresh(); setReload(n => n + 1);
     } catch (error) {setError(error instanceof Error ? error.message : String(error));}
     finally {setSaving(false);}
   };
@@ -109,7 +109,7 @@ export function WorkspaceFiles({session, files, busy, target, refresh, onDirtyCh
     <div className="file-layout"><FileTree files={files} selected={path} onSelect={choose} /><div className="file-editor"><h3>{path}{dirty ? ' • Unsaved' : ''}</h3>
       {error && <p role="alert">{error}</p>}
       {dirty && loadedSignature !== signature && <p role="status">This file changed on disk. Your draft is preserved; save will check for conflicts.</p>}
-      {loaded?.path === path && loaded.text !== undefined && <><MonacoFileEditor path={path} value={draft} readOnly={!loaded.editable || saving} onChange={setDraft} onSave={() => void save()} /><div className="file-actions"><button disabled={!dirty || !loaded.editable || busy || saving} onClick={() => void save()}>Save file</button><button disabled={!dirty || saving} onClick={discard}>Discard edits and reload</button><small>{loaded.editable ? busy ? 'Save is available after the agent finishes.' : path === '/project.json' ? 'Saving validates the timeline and creates a revision.' : 'Text files are editable. Ad.tsx updates the source studio preview.' : path.startsWith('/context/') ? 'Product context is read-only. Supply a new context version from the host to change it.' : 'Application history is read-only.'}</small></div></>}
+      {loaded?.path === path && loaded.text !== undefined && <><MonacoFileEditor path={path} value={draft} readOnly={!loaded.editable || saving} onChange={setDraft} onSave={value => void save(value)} /><div className="file-actions"><button disabled={!dirty || !loaded.editable || busy || saving} onClick={() => void save()}>Save file</button><button disabled={!dirty || saving} onClick={discard}>Discard edits and reload</button><small>{loaded.editable ? busy ? 'Save is available after the agent finishes.' : path === '/project.json' ? 'Saving validates the timeline and creates a revision.' : 'Text files are editable. Ad.tsx updates the source studio preview.' : path.startsWith('/context/') ? 'Product context is read-only. Supply a new context version from the host to change it.' : 'Application history is read-only.'}</small></div></>}
       {loaded?.path === path && loaded.url && <><div className="file-media">{loaded.mime.startsWith('image/') ? <img src={loaded.url} alt={path} /> : loaded.mime.startsWith('audio/') ? <audio src={loaded.url} controls /> : loaded.mime.startsWith('video/') ? <video src={loaded.url} controls /> : <p>Binary file · read-only</p>}</div><a href={loaded.url} download={path.split('/').at(-1)}>Download file</a></>}
     </div></div>
   </section>;

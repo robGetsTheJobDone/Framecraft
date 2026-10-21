@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {fileURLToPath, pathToFileURL} from 'node:url';
-import {chromium} from '@playwright/test';
+import {chromium, expect} from '@playwright/test';
 const root = process.env.STUDIO_TEST_ROOT ?? fileURLToPath(new URL('../packages/studio-playground/', import.meta.url));
 const require = createRequire(root + '/package.json');
 const vite = await import(pathToFileURL(require.resolve('vite')).href);
@@ -29,8 +29,7 @@ try {
   await page.getByLabel('File contents').press('ControlOrMeta+a');
   await page.keyboard.insertText('Saved with packaged Monaco');
   await page.getByLabel('File contents').press('ControlOrMeta+s');
-  await page.waitForFunction(async () => await window.testSession.workspace.read('/brief.md') === 'Saved with packaged Monaco');
-  assert.equal(await page.evaluate(() => window.testSession.workspace.read('/brief.md')), 'Saved with packaged Monaco');
+  await expect.poll(() => page.evaluate(() => window.testSession.workspace.read('/brief.md')), {timeout: 20000}).toBe('Saved with packaged Monaco');
   const workerReply = await page.evaluate(() => new Promise((resolve, reject) => {
     const worker = globalThis.MonacoEnvironment.getWorker('editorWorkerService', 'editorWorkerService');
     const timeout = setTimeout(() => {worker.terminate(); reject(new Error('Local editor worker did not respond'));}, 10000);

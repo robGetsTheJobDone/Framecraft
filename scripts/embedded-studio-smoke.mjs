@@ -9,6 +9,11 @@ const server=await vite.createServer({root,configFile:process.env.STUDIO_TEST_RO
 const browser=await chromium.launch();let page;
 try {
  page=await browser.newPage({viewport:{width:1440,height:1100}});
+ if(process.env.STUDIO_FORCE_SOFTWARE_AAC==='1')await page.addInitScript(()=>{
+   const native=AudioEncoder.isConfigSupported.bind(AudioEncoder);
+   window.forcedAacChecks=0;
+   AudioEncoder.isConfigSupported=async config=>{if(config.codec.startsWith('mp4a')){window.forcedAacChecks++;return {supported:false,config};}return native(config);};
+ });
  page.on('console',m=>{if(m.type()==='error')console.log('Browser:',m.text().slice(0,600));});
  page.on('pageerror',e=>console.log('Page error:',e.message));
  await page.goto('http://127.0.0.1:5177/embed-test.html');
@@ -122,5 +127,6 @@ try {
  assert.equal(mixSettings.fadeInSeconds,.2);
  console.log('Timeline inspector: dB volume and fade settings persisted.');
  await page.screenshot({path:'/tmp/deepbench-embedded.png',fullPage:true});
+ if(process.env.STUDIO_FORCE_SOFTWARE_AAC==='1')assert.ok(await page.evaluate(()=>window.forcedAacChecks>0));
  console.log('Embedded studio: scoped CSS, browser TSX compile, real frames, MP4 with audible AAC, mandatory planner/designer/reviewer loop passed.');
 } catch(e){console.log(await page?.locator('body').innerText());throw e;}finally{await browser.close();await server.close();}

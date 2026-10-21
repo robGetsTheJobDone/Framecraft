@@ -5,6 +5,7 @@ export interface AdFormat {id: string; width: number; height: number}
 export interface AdRenderInput {source: string; assets: Record<string, string>; format: AdFormat; durationSeconds: number; fps: number; audioMix?: string}
 export interface AdFrame {format: string; timeSeconds: number; dataUrl: string}
 let initialized: Promise<void> | undefined;
+let aacFallback: Promise<void> | undefined;
 export async function compileAd(source: string, wasmURL = new URL('./esbuild.wasm', import.meta.url).href) {
   if (source.length > 60000) throw new Error('Ad.tsx is limited to 60000 characters');
   initialized ??= esbuild.initialize({wasmURL}).catch(error => {initialized = undefined; throw error;});
@@ -72,7 +73,12 @@ export async function renderAd(input: AdRenderInput, options: {mode: 'review' | 
       if (input.audioMix) {
         audioContext = new AudioContext();
         decoded = await audioContext.decodeAudioData(await (await fetch(input.audioMix)).arrayBuffer());
-        if (!await canEncodeAudio(mp4 ? 'aac' : 'opus', {sampleRate: decoded.sampleRate, numberOfChannels: decoded.numberOfChannels})) throw new Error(mp4 ? 'This browser cannot encode AAC audio for MP4. Select WebM in the export format menu, or use a browser with AAC encoding support.' : 'This browser cannot encode Opus audio for WebM. Try MP4 or another browser.');
+        if (mp4 && !await canEncodeAudio('aac', {sampleRate: decoded.sampleRate, numberOfChannels: decoded.numberOfChannels})) {
+          aacFallback ??= import('@mediabunny/aac-encoder').then(({registerAacEncoder}) => {registerAacEncoder();}).catch(error => {aacFallback = undefined; throw error;});
+          await aacFallback;
+          options.signal?.throwIfAborted();
+        }
+        if (!await canEncodeAudio(mp4 ? 'aac' : 'opus', {sampleRate: decoded.sampleRate, numberOfChannels: decoded.numberOfChannels})) throw new Error(mp4 ? 'AAC encoding is unavailable for this audio configuration, including the software fallback. Select WebM or another browser.' : 'This browser cannot encode Opus audio for WebM. Try MP4 or another browser.');
         audio = new AudioBufferSource({codec: mp4 ? 'aac' : 'opus', bitrate: 128000});
         output.addAudioTrack(audio);
       }
