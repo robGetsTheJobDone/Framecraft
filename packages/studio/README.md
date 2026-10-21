@@ -23,10 +23,29 @@ The workspace, compilation, preview, audio mixing, and video export run in the b
 ## Install
 
 ```sh
-npm install @framecraft/studio react@^19 react-dom@^19
+npm install @framecraft/studio
 ```
 
-Use a client-side React 19 application with a browser bundler such as Vite. Server-side rendering is not supported. Microphone recording and browser video encoding require HTTPS or localhost and browser support.
+Use a client-side application with matching React and React DOM versions: **18.3.1 or React 19**. Keep the React version already installed in your app. Use a browser bundler such as Vite. Server-side rendering is not supported. Microphone recording and browser video encoding require HTTPS or localhost and browser support.
+
+### Vite configuration
+
+Keep Framecraft out of dependency prebundling so its local worker and dynamically loaded assets retain their paths:
+
+```ts
+// vite.config.ts — merge into your existing configuration.
+import {defineConfig} from 'vite';
+
+export default defineConfig({
+  optimizeDeps: {
+    exclude: ['@framecraft/studio'],
+    include: ['react', 'react-dom', 'react-dom/client',
+      'react/jsx-runtime', 'react/jsx-dev-runtime'],
+  },
+});
+```
+
+Pass the explicit WASM URL shown below. For other bundlers, configure equivalent worker and asset handling.
 
 ## Mount the studio
 

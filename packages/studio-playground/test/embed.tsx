@@ -1,4 +1,5 @@
 import React from 'react';
+(window as any).hostReactVersion = React.version;
 import {createRoot} from 'react-dom/client';
 import {MemoryFileSystem} from '@deepbench/browser-filesystem';
 import {AdStudio,createAdSession} from '@deepbench/studio';

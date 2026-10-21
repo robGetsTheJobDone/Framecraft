@@ -2,9 +2,10 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {fileURLToPath, pathToFileURL} from 'node:url';
 import {chromium} from '@playwright/test';
-const require = createRequire(new URL('../packages/studio-playground/package.json', import.meta.url));
+const root = process.env.STUDIO_TEST_ROOT ?? fileURLToPath(new URL('../packages/studio-playground/', import.meta.url));
+const require = createRequire(root + '/package.json');
 const vite = await import(pathToFileURL(require.resolve('vite')).href);
-const server = await vite.createServer({root: fileURLToPath(new URL('../packages/studio-playground/', import.meta.url)), resolve: {alias: [
+const server = await vite.createServer({root, configFile: process.env.STUDIO_TEST_ROOT ? undefined : false, resolve: {alias: process.env.STUDIO_TEST_ROOT ? [] : [
   {find: /^@deepbench\/studio$/, replacement: fileURLToPath(new URL('../packages/studio/portable/index.js', import.meta.url))},
   {find: '@deepbench/studio/styles.css', replacement: fileURLToPath(new URL('../packages/studio/portable/styles.css', import.meta.url))},
 ]}, logLevel: 'error', server: {host: '127.0.0.1', port: 5184, strictPort: true, hmr: false}});

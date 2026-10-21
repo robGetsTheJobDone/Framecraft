@@ -37,6 +37,7 @@ jobs:
       - run: node scripts/check-portable.mjs
       - run: pnpm exec playwright install --with-deps chromium
       - run: node scripts/monaco-portable-smoke.mjs
+      - run: pnpm test:react18
       - name: Inspect npm contents
         working-directory: packages/studio/portable
         run: npm pack --dry-run

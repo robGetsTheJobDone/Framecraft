@@ -5,6 +5,7 @@ const source = JSON.parse(await readFile(new URL('../packages/studio/package.jso
 const pkg = JSON.parse(await readFile(new URL('package.json', root), 'utf8'));
 assert.equal(pkg.name, '@framecraft/studio');
 assert.equal(pkg.version, source.version);
+assert.deepEqual(pkg.peerDependencies, source.peerDependencies);
 assert.equal(pkg.private, undefined);
 assert.equal(pkg.publishConfig.access, 'public');
 for (const [name, version] of Object.entries(pkg.dependencies ?? {})) {

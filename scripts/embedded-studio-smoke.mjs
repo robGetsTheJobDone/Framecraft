@@ -2,10 +2,10 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {chromium} from '@playwright/test';
-const root=fileURLToPath(new URL('../packages/studio-playground/',import.meta.url));
-const require=createRequire(new URL('../packages/studio-playground/package.json',import.meta.url));
+const root=process.env.STUDIO_TEST_ROOT ?? fileURLToPath(new URL('../packages/studio-playground/',import.meta.url));
+const require=createRequire(root+'/package.json');
 const vite=await import(pathToFileURL(require.resolve('vite')).href);
-const server=await vite.createServer({root,resolve:{alias:process.env.STUDIO_PORTABLE==='1'?[{find:/^@deepbench\/studio$/,replacement:fileURLToPath(new URL('../packages/studio/portable/index.js',import.meta.url))},{find:'@deepbench/studio/styles.css',replacement:fileURLToPath(new URL('../packages/studio/portable/styles.css',import.meta.url))}]:[]},logLevel:'error',server:{hmr:false,host:'127.0.0.1',port:5177,strictPort:true}});await server.listen();
+const server=await vite.createServer({root,configFile:process.env.STUDIO_TEST_ROOT?undefined:false,resolve:{alias:!process.env.STUDIO_TEST_ROOT&&process.env.STUDIO_PORTABLE==='1'?[{find:/^@deepbench\/studio$/,replacement:fileURLToPath(new URL('../packages/studio/portable/index.js',import.meta.url))},{find:'@deepbench/studio/styles.css',replacement:fileURLToPath(new URL('../packages/studio/portable/styles.css',import.meta.url))}]:[]},logLevel:'error',server:{hmr:false,host:'127.0.0.1',port:5177,strictPort:true}});await server.listen();
 const browser=await chromium.launch();let page;
 try {
  page=await browser.newPage({viewport:{width:1440,height:1100}});
@@ -15,7 +15,8 @@ try {
  await page.getByRole('heading',{name:'Untitled film',exact:true}).waitFor({timeout:60000});
  assert.equal(await page.locator('#host-heading').evaluate(el=>getComputedStyle(el).fontSize),'32px');
  assert.equal(await page.getByRole('switch',{name:'Reviewer mode'}).isChecked(),true);
- console.log('Embedded UI mounted');
+ if(process.env.STUDIO_EXPECT_REACT)assert.equal(await page.evaluate(()=>window.hostReactVersion),process.env.STUDIO_EXPECT_REACT);
+ console.log('Embedded UI mounted with React',await page.evaluate(()=>window.hostReactVersion));
  const result=await page.evaluate(()=>window.rendererCheck());
  console.log('Renderer:',result);assert.equal(result.frames,4);assert.equal(result.different,true);assert.ok(result.bytes>100);assert.equal(result.audible,true);
  await page.getByLabel('Message assistant').fill('Make a blue moving title');await page.getByRole('button',{name:'Send ↑',exact:true}).click();

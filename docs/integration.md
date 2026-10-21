@@ -1,12 +1,12 @@
 # Framecraft integration guide
 
-React 19 UI plus a browser-local workspace, TSX compiler, isolated Remotion preview, image assets, audio mixing, voiceover scripts, and a plan → design → render loop with configurable visual review.
+React 18.3.1 / 19 UI plus a browser-local workspace, TSX compiler, isolated Remotion preview, image assets, audio mixing, voiceover scripts, and a plan → design → render loop with configurable visual review.
 
 ## Run and install
 
 Run `pnpm dev`, then open http://localhost:5180/?mode=ad for the source studio. The default URL opens the source studio; `?mode=timeline` opens the legacy timeline playground. Only the playground gateway reads the root `.env`; the package has no server dependency.
 
-Run `pnpm pack:studio` to build `framecraft-studio-0.1.1.tgz`. In another project, run `pnpm add /absolute/path/to/framecraft-studio-0.1.1.tgz`. The artifact contains bundled workspace JavaScript, local declarations, CSS, and esbuild WASM, with no workspace-protocol dependencies. React and React DOM are host peers. Mount client-side using a browser bundler such as Vite; SSR is not supported.
+Run `pnpm pack:studio` to build `framecraft-studio-0.1.2.tgz`. In another project, run `pnpm add /absolute/path/to/framecraft-studio-0.1.2.tgz`. The artifact contains bundled workspace JavaScript, local declarations, CSS, and esbuild WASM, with no workspace-protocol dependencies. React and React DOM are host peers. Mount client-side using a browser bundler such as Vite; SSR is not supported. In Vite, exclude `@framecraft/studio` from dependency prebundling and explicitly include React and its JSX runtimes (see the [package README](../packages/studio/README.md)) and pass an explicit `wasmURL` imported from `@framecraft/studio/esbuild.wasm?url` so dependency prebundling does not relocate workers and compiler assets.
 
 ```tsx
 import {Studio} from '@framecraft/studio';

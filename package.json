@@ -12,7 +12,8 @@
     "test:studio-ai": "pnpm --filter '@deepbench/studio-playground^...' build && node scripts/studio-ai-smoke.mjs",
     "test:files": "pnpm --filter '@deepbench/studio-playground^...' build && node scripts/workspace-files-smoke.mjs",
     "test:embedded": "pnpm build && node scripts/embedded-studio-smoke.mjs",
-    "pack:studio": "pnpm build && node packages/studio/build/portable.mjs && pnpm --dir packages/studio/portable pack --pack-destination ../../../"
+    "pack:studio": "pnpm build && node packages/studio/build/portable.mjs && pnpm --dir packages/studio/portable pack --pack-destination ../../../",
+    "test:react18": "node scripts/react-compat-smoke.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",
