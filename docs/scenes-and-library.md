@@ -133,3 +133,15 @@ If a run fails after producing a valid draft, use **Restore saved draft** next t
 - Runtime uses pinned Remotion sequence context to retain authored duration through trims; the production browser regression covers this behavior on dependency upgrades.
 
 Run `pnpm test`, `pnpm --filter @deepbench/browser-ad-renderer test:browser`, then build the portable package and run `node scripts/scenes-portable-smoke.mjs`. The public-package smoke exercises real scene clocks, UI edits, undo/redo, library reuse, offline ZIP restoration, and WebM export. Existing ZIP and React compatibility suites remain required.
+
+## Unified editor
+
+Scenes and audio share one Timeline, with a single time ruler and inspector. Visual rows correspond to layers; scenes on the same layer share a row. Select a scene for timing and exposed settings, or an audio clip for trim, gain and fades. A continuous animation can remain one scene.
+
+The Library sidebar has Media and Brand components tabs. Search, insert, save and upgrade reusable components there; switching tabs preserves unfinished form values.
+
+## Feedback attachments
+
+Drop images or text files onto chat, or use Attach feedback. Review thumbnails and filenames, remove anything unwanted, then send your message. The planner, designer and reviewer receive the actual images and text as feedback references. References are kept in the run checkpoint and portable ZIP; they do not automatically become visual assets.
+
+Each message accepts up to six files: PNG, JPEG, WebP or GIF images up to 5 MB each, and UTF-8 text files up to 200 KB each (10 MB total). Unsupported files are rejected before sending. Embedders can also pass `attachments: [{name, mimeType, data}]` to `session.send`; image data is a data URL and text data is plain text.

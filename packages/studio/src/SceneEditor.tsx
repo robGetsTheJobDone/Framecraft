@@ -1,17 +1,19 @@
-import {useEffect, useState} from 'react';
+import {useEffect, useState, type ReactNode} from 'react';
 import type {AdSession, LibraryPin} from '@deepbench/browser-studio';
 import type {ComponentInput, JsonValue, SceneComponent, SceneInstance, StudioProject} from '@deepbench/studio-project';
 
 type SceneState = Awaited<ReturnType<AdSession['sceneState']>>;
 type Operations = Parameters<AdSession['editScenes']>[0]['operations'];
 
+export type SceneTimelineParts = {controls: ReactNode; lanes: ReactNode; inspector: ReactNode; status: ReactNode};
+
 /** Scene controls always mutate the same manifest consumed by preview and export. */
-export function SceneEditor({session, project, revision, busy, onChanged}: {
-  session: AdSession; project: StudioProject; revision?: number; busy: boolean; onChanged(): void;
+export function SceneEditor({session, project, revision, busy, onChanged, selected, onSelect, children}: {
+  session: AdSession; project: StudioProject; revision?: number; busy: boolean; onChanged(): void; selected?: string; onSelect(id?: string): void; children(parts: SceneTimelineParts): ReactNode;
 }) {
   const [state,setState] = useState<SceneState>();
   const [pins,setPins]=useState<LibraryPin[]>([]);
-  const [selected,setSelected] = useState<string>();
+  const setSelected=onSelect;
   const [working,setWorking] = useState(false);
   const [error,setError] = useState('');
   useEffect(()=>{let live=true;void Promise.all([session.sceneState(),session.library?.readPins()??Promise.resolve([])]).then(([value,libraryPins])=>{if(live){setState(value);setPins(libraryPins);}}).catch(error=>{if(live)setError(String(error));});return()=>{live=false;};},[session,revision,project]);
@@ -29,27 +31,20 @@ export function SceneEditor({session, project, revision, busy, onChanged}: {
     const newComponent:SceneComponent={id:componentId,entry:`/scenes/${componentId}.tsx`,authoredDurationInFrames:frames,inputs:{text:{type:'text',label:'Headline',required:true},color:{type:'color',label:'Text color',required:true}},defaults:{text:'Your next scene',color:'#ffffff'}};
     void apply([{type:'addComponent',component:newComponent,source:`import React from 'react';\nimport {AbsoluteFill} from 'remotion';\nexport default function Scene({text,color}) { return <AbsoluteFill style={{background:'#10141e',color,display:'flex',alignItems:'center',justifyContent:'center',fontSize:64,fontFamily:'sans-serif'}}>{text}</AbsoluteFill>; }\n`},{type:'addScene',scene:newScene}]).then(ok=>{if(ok)setSelected(id);});
   };
-  return <section className="scene-editor panel" aria-label="Scene editor">
-    <div className="panel-heading"><div><h2>Scenes</h2><small>{composition?'Timing and settings are shared with preview and export.':'This composition is edited through code or the assistant.'}</small></div>
-      {composition?<button disabled={disabled} onClick={add}>＋ Add scene</button>:<button disabled={disabled} onClick={()=>void run(()=>session.convertToScenes())}>Enable scene editing</button>}
-    </div>
-    {error&&<p className="error" role="alert">{error}</p>}
-    {working&&<p role="status">Validating scene changes…</p>}
-    {!composition?<p className="muted">Keep the current composition as one scene. Its visuals stay intact; you can then add scenes and edit their arrangement.</p>:<div className="scene-editor-body">
-      <div className="scene-list"><div className="scene-ruler"><span>0s</span><span>{project.durationSeconds}s</span></div>
-        {[...composition.scenes].sort((a,b)=>b.layer-a.layer).map(item=><div className="scene-row" key={item.id}>
-          <button className={selected===item.id?'scene-name selected':'scene-name'} aria-pressed={selected===item.id} onClick={()=>setSelected(item.id)}>{item.name??item.id}</button>
-          <div className="scene-lane"><button aria-label={`Select scene ${item.name??item.id}`} className="scene-block" style={{left:`${item.startFrame/(project.durationSeconds*project.fps)*100}%`,width:`${item.durationInFrames/(project.durationSeconds*project.fps)*100}%`}} onClick={()=>setSelected(item.id)}>{(item.startFrame/project.fps).toFixed(2)}–{((item.startFrame+item.durationInFrames)/project.fps).toFixed(2)}s</button></div>
-        </div>)}
-        {!composition.scenes.length&&<p>No scenes yet. Add a scene or ask the assistant to build one.</p>}
-      </div>
-      {scene&&component?<SceneInspector key={`${state.revision}:${scene.id}`} scene={scene} component={component} project={project} disabled={disabled} usages={composition.scenes.filter(item=>item.componentId===component.id).length} pin={pins.find(pin=>pin.localComponentId===component.id)}
+  const controls=!state?<button disabled>Loading scenes…</button>:composition?<button disabled={disabled} onClick={add}>＋ Add scene</button>:<button disabled={disabled} onClick={()=>void run(()=>session.convertToScenes())}>Enable scene editing</button>;
+  const lanes=!state?<p role="status">Loading scenes…</p>:composition?<>
+    {[...new Set(composition.scenes.map(scene=>scene.layer))].sort((a,b)=>b-a).map(layer=><div className="track scene-track" key={layer}>
+      <div className="track-label"><strong>Visuals · {layer+1}</strong></div>
+      <div className="track-lane">{composition.scenes.filter(item=>item.layer===layer).map(item=><button key={item.id} aria-label={`Select scene ${item.name??item.id}`} aria-pressed={selected===item.id} className={`clip scene-block ${selected===item.id?'selected':''}`} style={{left:`${item.startFrame/(project.durationSeconds*project.fps)*100}%`,width:`${item.durationInFrames/(project.durationSeconds*project.fps)*100}%`}} onClick={()=>setSelected(item.id)} title={`${item.name??'Scene'} · ${(item.startFrame/project.fps).toFixed(2)}–${((item.startFrame+item.durationInFrames)/project.fps).toFixed(2)}s`}>{item.name??'Scene'}</button>)}</div>
+    </div>)}
+    {!composition.scenes.length&&<div className="track"><div className="track-label"><strong>Visuals</strong></div><div className="track-lane timeline-empty">Add a scene or ask the assistant to build one.</div></div>}
+  </>:<div className="track"><div className="track-label"><strong>Visuals</strong></div><div className="track-lane timeline-empty">One continuous composition. Enable scene editing to arrange it here.</div></div>;
+  const inspector=state&&composition&&scene&&component?<SceneInspector key={`${state.revision}:${scene.id}`} scene={scene} component={component} project={project} disabled={disabled} usages={composition.scenes.filter(item=>item.componentId===component.id).length} pin={pins.find(pin=>pin.localComponentId===component.id)}
         onSave={patch=>void apply([{type:'updateScene',id:scene.id,patch}])}
         onDuplicate={()=>{const id=crypto.randomUUID();void apply([{type:'addScene',scene:{...structuredClone(scene),id,name:`${scene.name??'Scene'} copy`,layer:Math.max(...composition.scenes.map(item=>item.layer))+1}}]).then(ok=>{if(ok)setSelected(id);});}}
         onFork={()=>void apply([{type:'forkScene',id:scene.id,componentId:crypto.randomUUID(),entry:`${component.entry.slice(0,component.entry.lastIndexOf('/'))}/${crypto.randomUUID()}.tsx`}])}
-        onRemove={()=>void apply([{type:'removeScene',id:scene.id}]).then(ok=>{if(ok)setSelected(undefined);})}/>:<p className="muted">Select a scene to change its timing, layer, or exposed settings. Higher layers appear above lower layers.</p>}
-    </div>}
-  </section>;
+        onRemove={()=>void apply([{type:'removeScene',id:scene.id}]).then(ok=>{if(ok)setSelected(undefined);})}/>:null;
+  return children({controls,lanes,inspector,status:<>{error&&<p className="error" role="alert">{error}</p>}{working&&<p role="status">Validating scene changes…</p>}</>});
 }
 
 function SceneInspector({scene,component,project,disabled,usages,pin,onSave,onDuplicate,onFork,onRemove}: {

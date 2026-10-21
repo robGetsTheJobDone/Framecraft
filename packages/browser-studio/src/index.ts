@@ -272,3 +272,6 @@ export {createZipFileAdapter, snapshotToZip, zipToSnapshot} from './zip.js';
 
 export type {SceneOperation, SceneEdit} from './scene-session.js';
 export * from './component-library.js';
+
+export {validateFeedback,feedbackLimits} from './feedback.js';
+export type {FeedbackAttachment} from './feedback.js';

@@ -13,7 +13,7 @@ try {
  await page.waitForFunction(()=>window.sceneTest,{timeout:60000});
  const before=await page.evaluate(()=>window.sceneTest.capture(20));
  assert.deepEqual(before.background,[255,0,0,255]);assert.deepEqual(before.localClock,[0,255,255,255]);assert.deepEqual(before.authoredDuration,[255,255,255,255]);
- await page.getByRole('button',{name:'First scene',exact:true}).click();
+ await page.getByRole('button',{name:'Select scene First scene',exact:true}).click();
  await page.getByLabel('Scene start',{exact:true}).fill('3');
  await page.getByRole('button',{name:'Apply scene changes',exact:true}).click();
  await expect.poll(()=>page.evaluate(async()=>(await window.sceneTest.session.sceneState()).composition.scenes.find(s=>s.id==='first').startFrame)).toBe(30);
@@ -22,6 +22,11 @@ try {
  await expect.poll(()=>page.evaluate(async()=>(await window.sceneTest.session.sceneState()).composition.scenes.find(s=>s.id==='first').startFrame)).toBe(20);
  await page.getByRole('button',{name:'Redo',exact:true}).click();
  await expect.poll(()=>page.evaluate(async()=>(await window.sceneTest.session.sceneState()).composition.scenes.find(s=>s.id==='first').startFrame)).toBe(30);
+ await expect(page.getByRole('region',{name:'Timeline',exact:true})).toHaveCount(1);
+ await expect(page.locator('.ruler')).toHaveCount(1);
+ await expect(page.getByRole('heading',{name:'Scenes',exact:true})).toHaveCount(0);
+ await page.getByRole('tab',{name:'Brand components',exact:true}).click();
+ await expect(page.getByRole('tabpanel',{name:'Brand components',exact:true})).toBeVisible();
  // Publish through the UI, including a transitive shared helper, then pin the package.
  await page.getByText('Save or upgrade a project component',{exact:true}).click();
  await page.getByLabel('Project component',{exact:true}).selectOption('card');
@@ -33,14 +38,17 @@ try {
  await page.getByRole('button',{name:/Shared card.*1.0.0/}).click();
  await page.getByRole('button',{name:'Insert saved version',exact:true}).click();
  await page.getByText('Added Shared card 1.0.0.',{exact:true}).waitFor();
+ await page.getByRole('tab',{name:/Media/}).click();
+ await expect(page.getByRole('button',{name:'Search library',exact:true})).not.toBeVisible();
+ await page.getByRole('tab',{name:'Brand components',exact:true}).click();
+ await expect(page.getByText('Added Shared card 1.0.0.',{exact:true})).toBeVisible();
  // The insertion event starts an asynchronous iframe rebuild. Check the actual
  // live Player rather than mistaking a temporary blank iframe for a rendered frame.
  const preview=page.frameLocator('.preview-area iframe[title="Ad composition"]');
  await expect(preview.getByRole('button',{name:'Play video',exact:true})).toBeVisible();
  await expect.poll(()=>preview.locator('.__remotion-player').evaluate(element=>Array.from(element.querySelectorAll('div')).some(node=>node.style.backgroundColor==='rgb(255, 0, 0)')).catch(()=>false),{timeout:30000}).toBe(true);
  await preview.getByRole('button',{name:'Play video',exact:true}).click();
- await expect.poll(()=>preview.locator('.__remotion-player').evaluate(element=>Array.from(element.querySelectorAll('div')).some(node=>node.style.backgroundColor==='rgb(0, 255, 255)'&&parseFloat(node.style.left)>0)).catch(()=>false),{timeout:30000}).toBe(true);
- await preview.getByRole('button',{name:'Pause video',exact:true}).click();
+ await expect.poll(async()=>{const play=preview.getByRole('button',{name:'Play video',exact:true});if(await play.count())await play.click();return preview.locator('.__remotion-player').evaluate(element=>Array.from(element.querySelectorAll('div')).some(node=>node.style.backgroundColor==='rgb(0, 255, 255)'&&parseFloat(node.style.left)>0)).catch(()=>false);},{timeout:30000,intervals:[250]}).toBe(true);
  const result=await page.evaluate(async()=>{
   const {session,importAdZip,MemoryFileSystem}=window.sceneTest;
   const before=await session.sceneState();const pins=await session.library.readPins();
@@ -51,6 +59,22 @@ try {
   return{scenes:after.composition.scenes.length,same:JSON.stringify(before.composition)===JSON.stringify(after.composition)&&JSON.stringify(before.modules)===JSON.stringify(after.modules),pins:pins.length,portable:!!input.modules,bytes:video.size};
  });
  assert.equal(result.scenes,3);assert.equal(result.same,true);assert.equal(result.pins,1);assert.equal(result.portable,true);assert.ok(result.bytes>100);
+ // Exercise feedback attachment delivery through the actual chat composer, without provider calls.
+ await page.evaluate(()=>{window.sceneTest.session.send=async(prompt,config)=>{window.sentFeedback={prompt,attachments:config.attachments};return{message:'Feedback received',approved:false};};});
+ const png=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg==','base64');
+ await page.getByLabel('Attach feedback files',{exact:true}).setInputFiles([{name:'markup.png',mimeType:'image/png',buffer:png},{name:'remove-me.txt',mimeType:'text/plain',buffer:Buffer.from('Discard this note')}]);
+ await expect(page.getByRole('img',{name:'Feedback: markup.png',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Remove attachment remove-me.txt',exact:true}).click();
+ await page.locator('.chat').evaluate(element=>{const transfer=new DataTransfer();transfer.items.add(new File(['Make the headline larger.'],'feedback.md',{type:'text/plain'}));element.dispatchEvent(new DragEvent('drop',{bubbles:true,dataTransfer:transfer}));});
+ await expect(page.getByRole('button',{name:'Remove attachment feedback.md',exact:true})).toBeVisible();
+ await page.getByLabel('Message assistant',{exact:true}).fill('Apply my annotated feedback');
+ await page.getByRole('button',{name:'Send ↑',exact:true}).click();
+ await expect(page.getByText('Feedback received',{exact:true})).toBeVisible();
+ const sent=await page.evaluate(()=>window.sentFeedback);
+ assert.equal(sent.attachments.length,2);assert.equal(sent.attachments[0].data,`data:image/png;base64,${png.toString('base64')}`);assert.equal(sent.attachments[1].data,'Make the headline larger.');
+ await expect(page.getByRole('button',{name:'Remove attachment feedback.md',exact:true})).toHaveCount(0);
+ await page.getByLabel('Attach feedback files',{exact:true}).setInputFiles({name:'unsupported.pdf',mimeType:'application/pdf',buffer:Buffer.from('unsupported')});
+ await expect(page.getByRole('alert')).toContainText('attach an image or text file');
  await page.screenshot({path:'/tmp/framecraft-scenes-success.png',fullPage:true});
  assert.deepEqual(errors,[]);
  console.log('Packaged scene editor: real frame clocks, timing UI, undo/redo, shared library save/insert, offline ZIP restoration and WebM export passed.',result);
