@@ -66,3 +66,7 @@ Applications supply model and image-generation adapters; the development playgro
 ## Embed in another app
 
 See [the studio package](packages/studio/README.md) for the React component, headless session, skills, adapters, portable install, and current browser limitations. Open http://localhost:5180/?mode=ad for the source-based workflow.
+
+## Publishing
+
+See [PUBLISHING.md](PUBLISHING.md) for the npm release workflow and one-time trusted publisher setup. The installable artifact is `@deepbench/studio`; internal packages remain private.
