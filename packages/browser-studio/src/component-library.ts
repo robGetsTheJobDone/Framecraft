@@ -1,5 +1,6 @@
 import {MemoryFileSystem, normalizePath, type BrowserFileSystem} from '@deepbench/browser-filesystem';
 import {validateComposition,validateComponentProps} from '@deepbench/studio-project';
+import {isBase64} from './base64-validation.js';
 
 export type LibraryValue = string | number | boolean | null | LibraryValue[] | {[key: string]: LibraryValue};
 export interface LibraryInput {type: 'text' | 'number' | 'boolean' | 'color' | 'enum' | 'asset'; label?: string; required?: boolean; options?: string[]; min?: number; max?: number}
@@ -39,7 +40,7 @@ function canonical(value: unknown): string {
 async function hashBytes(bytes: Uint8Array) {return [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes as Uint8Array<ArrayBuffer>))].map(b => b.toString(16).padStart(2,'0')).join('');}
 export async function componentContentHash(value: unknown) {return hashBytes(enc.encode(canonical(value)));}
 function decodeAsset(data: string) {
-  if (typeof data !== 'string' || data.length > componentLibraryLimits.assetBytes * 4 / 3 + 4 || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(data)) fail('Invalid component asset encoding or size');
+  if (typeof data !== 'string' || data.length > componentLibraryLimits.assetBytes * 4 / 3 + 4 || !isBase64(data)) fail('Invalid component asset encoding or size');
   const bytes = Uint8Array.from(atob(data), c => c.charCodeAt(0));
   if (bytes.byteLength > componentLibraryLimits.assetBytes) fail('Component asset exceeds size limit');
   return bytes;

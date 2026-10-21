@@ -17,7 +17,7 @@ import {renderAd, type AdFormat, type AdFrame, type AdRenderInput} from '@deepbe
 import {audioClipSettingsSchema, audioClipSettingsDescription, openStudioSession, type ImageGenerationProvider, type StudioSession} from './index.js';
 import {createSkillRegistry, type StudioSkill, type AgentRole} from './skills.js';
 import {adDesignSkills} from './ad-skills.js';
-import {adProductionPlanSchema, storedProductionPlanSchema, validateProductionPlan} from './production-plan.js';
+import {adProductionPlanSchema, storedProductionPlanSchema, validateProductionPlan, type AdProductionPlan} from './production-plan.js';
 import type {SpeechProvider} from '@deepbench/studio-dubbing';
 import {createConversationFileSystem, assertValidProject, type StudioProject, type StudioAsset} from '@deepbench/studio-project';
 
@@ -216,14 +216,14 @@ export async function createAdSession(options: AdSessionOptions) {
     },
   }):undefined;
   const library=makeLibrary(base,input=>manualEdit(input.baseRevision,session=>applyLibraryCommit(session,input)));
-  type Candidate = Snapshot & {review?:VisualReview;files:WorkspaceFiles};
+  type Candidate = Snapshot & {review?:VisualReview;reviewState?:'pending'|'complete'|'disabled'|'failed';files:WorkspaceFiles};
   type SavedCandidate = Omit<Candidate,'files'> & {files:WorkspaceFiles};
   type Recovery = {
     schemaVersion:1; runId:string; prompt:string; reviewEnabled:boolean; libraryPublish?:boolean; policy:typeof policy;
     skills:Record<AgentRole,StudioSkill[]>; instructions:Record<AgentRole,string>; original:Snapshot; candidate:WorkspaceFiles;
     round:number; phase:'planning'|'designing'|'rendering'|'committing';
     messages:StoredMessage[]; turn:number; toolIndex:number; pending?:{id:string;name:string};
-    edited:boolean; finished:boolean; feedback:string; stalled:number; generated:number;
+    edited:boolean; finished:boolean; feedback:string; refinementFailure?:string; stalled:number; generated:number;
     generatedKeys:Record<string,string>; best?:SavedCandidate; lastCandidate?:SavedCandidate;
   };
   const saveCandidate=(value:Candidate|undefined):SavedCandidate|undefined=>value;
@@ -245,13 +245,14 @@ export async function createAdSession(options: AdSessionOptions) {
     const model = (role: AgentRole) => options.agents?.[role]?.model ?? options.adapters.model;
     const runPolicy = recovery?.policy ?? policy;
     let best = loadCandidate(recovery?.best);
+    let refinementFailure=recovery?.refinementFailure;
     let feedback = recovery?.feedback ?? ''; let stalled = recovery?.stalled ?? 0; let generated = recovery?.generated ?? 0;
     const generatedKeys: Record<string,string> = recovery?.generatedKeys ?? {};
     let cursor = {round:recovery?.round??1, phase:recovery?.phase??'planning' as Recovery['phase'], messages:recovery?.messages??[] as StoredMessage[],turn:recovery?.turn??0,toolIndex:recovery?.toolIndex??0,pending:recovery?.pending,edited:recovery?.edited??false,finished:recovery?.finished??false};
     const checkpoint = async (status: string, extra = {}) => {
       if (persistenceFailed) return;
       try {
-        const state:Recovery={schemaVersion:1,runId,prompt,reviewEnabled,libraryPublish:publishAllowed,policy:runPolicy,skills:roleSkills,instructions:{planner:instructions('planner'),designer:instructions('designer'),reviewer:instructions('reviewer')},original,candidate:await captureFiles(candidate.filesystem),...cursor,feedback,stalled,generated,generatedKeys,best:saveCandidate(best),lastCandidate:saveCandidate(lastCandidate)};
+        const state:Recovery={schemaVersion:1,runId,prompt,reviewEnabled,libraryPublish:publishAllowed,policy:runPolicy,skills:roleSkills,instructions:{planner:instructions('planner'),designer:instructions('designer'),reviewer:instructions('reviewer')},original,candidate:await captureFiles(candidate.filesystem),...cursor,feedback,refinementFailure,stalled,generated,generatedKeys,best:saveCandidate(best),lastCandidate:saveCandidate(lastCandidate)};
         // Immutable state first, pointer last: a torn local write leaves the previous boundary readable.
         const statePath=`${folder}/checkpoints/${crypto.randomUUID()}.json`;
         await fs.writeFile(statePath,JSON.stringify(state),{createParents:true});
@@ -279,23 +280,49 @@ export async function createAdSession(options: AdSessionOptions) {
       for (let round = cursor.round; round <= runPolicy.maxRounds && cursor.phase !== 'committing'; round++) {
         signal.throwIfAborted(); emit({type:'planning',runId,round});
         const currentInput = (await inputs(candidate))[0];
-        const previousPlan = storedProductionPlanSchema.safeParse(JSON.parse(await read(candidate.filesystem,'/plan.json')));
+        const currentProject=await candidate.store.load();
+        const visualContext={renderMode:currentInput.composition?'scenes':'source',currentSource:currentInput.composition?undefined:currentInput.source,composition:currentInput.composition,modules:currentInput.modules,assets:currentProject.assets.map(({id,name,kind,mimeType,width,height,durationSeconds})=>({id,name,kind,mimeType,width,height,durationSeconds})),imageAssetIds:Object.keys(currentInput.assets),timeline:currentProject.tracks,duration:currentInput.durationSeconds,fps:currentInput.fps};
+        const savedPlanText=await read(candidate.filesystem,'/plan.json');let savedPlan:unknown;try{savedPlan=JSON.parse(savedPlanText);}catch{savedPlan=null;}
+        const previousPlan = storedProductionPlanSchema.safeParse(savedPlan);
         let editPlan: z.infer<typeof editPlanSchema> | undefined;
         const continuing = cursor.phase !== 'planning';
-        if (!continuing && previousPlan.success && conversation.filter(message=>message.role==='user').length > 1) {
-          editPlan = editPlanSchema.parse(await model('planner').withStructuredOutput(editPlanSchema,{name:'edit_plan'}).invoke([
-            new SystemMessage(instructions('planner')+'\nPlan a targeted edit of the current composition. List exact changes and what to preserve. Set needsProductionPlan only for a requested structural redesign, new scenes/assets, or duration changes. Simple text, color, timing, and positioning edits do not need a new production plan.'),
-            new HumanMessage(JSON.stringify({request:prompt,currentSource:currentInput.source,composition:currentInput.composition,modulePaths:Object.keys(currentInput.modules??{}),currentPlan:previousPlan.data,assets:Object.keys(currentInput.assets),feedback}))
-          ],{signal}));
-          await fs.writeFile(`${folder}/${round}/edit-plan.json`,JSON.stringify(editPlan),{createParents:true});
+        let proposedPlan:AdProductionPlan|undefined;let planError:string|undefined;
+        for(let attempt=0;attempt<2&&!proposedPlan;attempt++){
+          try {
+            if(attempt===0&&!continuing&&round===1&&previousPlan.success&&conversation.filter(message=>message.role==='user').length>1){
+              editPlan=editPlanSchema.parse(await model('planner').withStructuredOutput(editPlanSchema,{name:'edit_plan'}).invoke([
+                new SystemMessage(instructions('planner')+'\nPlan a targeted edit of the current composition. List exact changes and what to preserve. Set needsProductionPlan only for a requested structural redesign, new scenes/assets, or duration changes. Simple text, color, timing, and positioning edits do not need a new production plan. Code-drawn vectors are module source, not reusable image assets.'),
+                new HumanMessage(JSON.stringify({request:prompt,...visualContext,currentPlan:previousPlan.data,feedback}))
+              ],{signal}));
+            }
+            const reuse=attempt===0&&previousPlan.success&&(continuing||round>1||!!(editPlan&&!editPlan.needsProductionPlan));
+            const next=reuse?{
+              ...previousPlan.data,
+              nextChanges:editPlan?.changes??(round>1?[...((lastCandidate?.review?.issues??[]).map(issue=>issue.fix)),feedback].filter(Boolean).slice(0,8).map(change=>change.slice(0,600)):previousPlan.data.nextChanges),
+              assets:previousPlan.data.assets.map(asset=>generatedKeys[asset.key]&&Object.hasOwn(currentInput.assets,generatedKeys[asset.key])?{...asset,action:'reuse' as const,assetId:generatedKeys[asset.key]}:asset),
+            }:adProductionPlanSchema.parse(await model('planner').withStructuredOutput(adProductionPlanSchema,{name:'production_plan'}).invoke([
+              new SystemMessage(instructions('planner')+'\nReturn a concise production plan, never private reasoning. Preserve the current design except for requested changes. Reuse only actual imageAssetIds from the supplied asset metadata. A scene, component, planned asset key, or code-drawn vector is NOT an image asset. List raster assets only when required; use an empty assets list for visuals drawn entirely in code. On validation feedback, repair the invalid plan without inventing asset IDs or rewriting an existing working design.'),
+              new HumanMessage(JSON.stringify({brief,conversation,...visualContext,currentPlan:previousPlan.success?previousPlan.data:undefined,feedback,...(planError?{planValidationError:planError,repairAttempt:attempt}: {})}))
+            ],{signal}));
+            // A retained intent plan can have old timing after manual timeline edits. Asset identity is always validated.
+            validateProductionPlan(next,currentInput.assets,currentInput.durationSeconds,generatedKeys,{validateTiming:!reuse});
+            proposedPlan=next;
+          }catch(error){
+            if(persistenceFailed)throw error;signal.throwIfAborted();
+            planError=error instanceof Error?error.message:String(error);
+            await fs.writeFile(`${folder}/${round}/planning-error.txt`,planError,{createParents:true});
+            emit({type:'planning',runId,round,message:attempt===0?'Repairing an invalid production plan: '+planError:'Production plan could not be repaired: '+planError});
+          }
         }
-        const plan = continuing ? storedProductionPlanSchema.parse(JSON.parse(await read(candidate.filesystem,'/plan.json'))) : previousPlan.success && editPlan && !editPlan.needsProductionPlan
-          ? {...previousPlan.data, nextChanges:editPlan.changes, assets:previousPlan.data.assets.map(asset => generatedKeys[asset.key] && Object.hasOwn(currentInput.assets,generatedKeys[asset.key]) ? {...asset,action:'reuse' as const,assetId:generatedKeys[asset.key]} : asset)}
-          : adProductionPlanSchema.parse(await model('planner').withStructuredOutput(adProductionPlanSchema, {name:'production_plan'}).invoke([new SystemMessage(instructions('planner')+'\nReturn a concise production plan, never private reasoning. Preserve the current design except for requested changes.'), new HumanMessage(JSON.stringify({brief, conversation, currentSource:currentInput.source, currentPlan:previousPlan.success?previousPlan.data:undefined, assets:Object.keys(currentInput.assets), duration:currentInput.durationSeconds, feedback}))], {signal}));
-        emit({type:'planning',runId,round,message:editPlan ? 'Edit plan: '+editPlan.changes.join('; ') : plan.concept+'\n'+plan.scenes.map(scene=>`${scene.start}–${scene.end}s: ${scene.copy}`).join('\n')});
-        if(!currentInput.composition||!editPlan||editPlan.needsProductionPlan)validateProductionPlan(plan, currentInput.assets, currentInput.durationSeconds, generatedKeys);
-        await candidate.filesystem.writeFile('/plan.json', JSON.stringify(plan));
-        await fs.writeFile(`${folder}/${round}/plan.json`, JSON.stringify(plan), {createParents:true});
+        if(!proposedPlan){
+          if(best){refinementFailure=`Planning stopped after two attempts: ${planError}`;feedback=refinementFailure;cursor.phase='committing';await checkpoint('running');break;}
+          throw new Error(`Production planning failed after two attempts: ${planError}. Previous working version is preserved.`);
+        }
+        const plan=proposedPlan;
+        if(editPlan)await fs.writeFile(`${folder}/${round}/edit-plan.json`,JSON.stringify(editPlan),{createParents:true});
+        emit({type:'planning',runId,round,message:editPlan?'Edit plan: '+editPlan.changes.join('; '):round>1?'Applying review corrections to the existing design.':plan.concept+'\n'+plan.scenes.map(scene=>`${scene.start}–${scene.end}s: ${scene.copy}`).join('\n')});
+        await candidate.filesystem.writeFile('/plan.json',JSON.stringify(plan));
+        await fs.writeFile(`${folder}/${round}/plan.json`,JSON.stringify(plan),{createParents:true});
         let finished = continuing && cursor.finished; let edited = continuing && cursor.edited;
         const tools: StructuredToolInterface[] = [
           tool(async()=>{await convertSession(candidate);edited=true;return JSON.stringify({revision:await revisionHash(await revisionFiles(candidate.filesystem)),composition:(await candidate.store.load()).composition});},{name:'convert_source_to_scene',description:'Explicitly convert a legacy source composition into one opaque scene, preserving its visuals, duration and audio. Use when the user requests conversion before structured editing; does not decompose its internal animations.',schema:z.object({})}),
@@ -362,7 +389,7 @@ export async function createAdSession(options: AdSessionOptions) {
         tools.push(...(options.tools?.({session:candidate,signal}) ?? []) as typeof tools);
         if (new Set(tools.map(t=>t.name)).size !== tools.length) throw new Error('Custom tool names must be unique');
         const designer = model('designer').bindTools!(tools);
-        const messages: BaseMessage[] = continuing ? mapStoredMessagesToChatMessages(cursor.messages) : [new SystemMessage(instructions('designer')),new HumanMessage(JSON.stringify({brief,conversation,plan,currentSource:currentInput.source,composition:currentInput.composition,modules:currentInput.modules,revision:await revisionHash(await revisionFiles(candidate.filesystem)),assets:Object.keys(currentInput.assets),timeline:(await candidate.store.load()).tracks,music:(await candidate.filesystem.list('/',{recursive:true})).filter(file=>file.path.startsWith('/music/')&&file.path.endsWith('.json')).map(file=>file.path),editPlan,feedback}))];
+        const messages: BaseMessage[] = continuing ? mapStoredMessagesToChatMessages(cursor.messages) : [new SystemMessage(instructions('designer')),new HumanMessage(JSON.stringify({brief,conversation,plan,...visualContext,revision:await revisionHash(await revisionFiles(candidate.filesystem)),music:(await candidate.filesystem.list('/',{recursive:true})).filter(file=>file.path.startsWith('/music/')&&file.path.endsWith('.json')).map(file=>file.path),editPlan,feedback}))];
         const syncCursor=()=>{cursor.messages=mapChatMessagesToStoredMessages(messages);cursor.edited=edited;cursor.finished=finished;};
         if (!continuing) {cursor={round,phase:'designing',messages:[],turn:0,toolIndex:0,pending:undefined,edited:false,finished:false};syncCursor();await checkpoint('running');}
         for (let turn=cursor.turn;turn<24 && !finished;turn++) {
@@ -414,19 +441,23 @@ export async function createAdSession(options: AdSessionOptions) {
           const project=await candidate.store.load();
           const checkIssues: string[]=[];
           for (const check of options.checks??[]) checkIssues.push(...await check({source,project,frames,modules:project.composition?await readProjectModules(candidate.filesystem):undefined,composition:project.composition}));
+          if(!reviewEnabled&&checkIssues.length)throw new Error(checkIssues.join('; '));
+          const candidateFiles=await revisionFiles(candidate.filesystem);
+          lastCandidate={source,plan:JSON.stringify({...plan,assets:plan.assets.map(asset=>generatedKeys[asset.key]?{...asset,action:'reuse',assetId:generatedKeys[asset.key]}:asset)}),project:structuredClone(project),reviewState:reviewEnabled?'pending':'disabled',files:candidateFiles};
+          // A review-provider failure must not discard a successfully rendered, portable draft.
+          await checkpoint('running');
           let review: VisualReview | undefined;
           if (reviewEnabled) {
             const reviewer = model('reviewer').withStructuredOutput(reviewSchema,{name:'visual_review'});
-            const content: any[]=[{type:'text',text:JSON.stringify({brief,conversation,source,plan,previousFeedback:feedback})}];
+            const content: any[]=[{type:'text',text:JSON.stringify({brief,conversation,renderMode:project.composition?'scenes':'source',source:project.composition?undefined:source,composition:project.composition,modules:project.composition?await readProjectModules(candidate.filesystem):undefined,assets:project.assets,timeline:project.tracks,duration:project.durationSeconds,fps:project.fps,plan,previousFeedback:feedback})}];
             for (const frame of frames) content.push({type:'text',text:`${frame.format} at ${frame.timeSeconds.toFixed(2)}s`},{type:'image_url',image_url:{url:frame.dataUrl}});
             emit({type:'review',runId,round,message:'Reviewing rendered frames…'});
-            review=reviewSchema.parse(await reviewer.invoke([new SystemMessage(instructions('reviewer')),new HumanMessage({content})],{signal}));
+            review=reviewSchema.parse(await reviewer.invoke([new SystemMessage(instructions('reviewer')+'\nReview the rendered frames against the actual visual source. In scenes mode, composition and modules are the visual implementation; Ad.tsx is not rendered and is intentionally omitted. A planned image may be implemented with code-drawn vectors; do not invent a missing image requirement when the rendered design fulfills the brief. Audio evidence is timeline/asset metadata, not visible pixels.'),new HumanMessage({content})],{signal}));
             for (const issue of checkIssues) review.issues.push({severity:'major',problem:issue,fix:'Resolve this automated check before approval.'});
             await fs.writeFile(`${folder}/${round}/review.json`,JSON.stringify(review),{createParents:true});
             emit({type:'review',runId,round,review,message:review.score+'/10 · '+review.feedback});
-          } else if (checkIssues.length) throw new Error(checkIssues.join('; '));
-          const candidateFiles=await revisionFiles(candidate.filesystem);
-          lastCandidate={source,plan:JSON.stringify({...plan,assets:plan.assets.map(asset=>generatedKeys[asset.key]?{...asset,action:'reuse',assetId:generatedKeys[asset.key]}:asset)}),project:structuredClone(project),review,files:candidateFiles};
+          }
+          lastCandidate.review=review;lastCandidate.reviewState=reviewEnabled?'complete':'disabled';
           liveInputs=await inputs(candidate);emit({type:'preview',runId,round});
           if (!review) {best=lastCandidate;cursor.phase='committing';await checkpoint('running');break;}
           const major=review.issues.filter(i=>i.severity!=='minor').length;
@@ -439,14 +470,14 @@ export async function createAdSession(options: AdSessionOptions) {
           if (stalled>=runPolicy.stopAfterStalledRounds) {cursor.phase='committing';await checkpoint('running',{round,review});break;}
         } catch(e) {
           if(persistenceFailed)throw e;
-          signal.throwIfAborted();feedback=`Compilation/render/review error: ${e instanceof Error?e.message:String(e)}`;
+          signal.throwIfAborted();if(lastCandidate?.reviewState==='pending')lastCandidate.reviewState='failed';feedback=`Compilation/render/review error: ${e instanceof Error?e.message:String(e)}`;
           await fs.writeFile(`${folder}/${round}/error.txt`,feedback,{createParents:true});emit({type:'error',runId,round,message:feedback});
         }
         cursor={round:round+1,phase:'planning',messages:[],turn:0,toolIndex:0,pending:undefined,edited:false,finished:false};await checkpoint('running');
       }
       signal.throwIfAborted();
-      if (!runPolicy.keepBestVersion && lastCandidate) best=lastCandidate;
-      if (!best) throw new Error(`No successfully rendered${reviewEnabled?' and reviewed':''} candidate. Previous working version is preserved.`);
+      if (!runPolicy.keepBestVersion && lastCandidate && (!reviewEnabled||lastCandidate.review)) best=lastCandidate;
+      if (!best||(reviewEnabled&&!best.review)) throw new Error(`No successfully rendered${reviewEnabled?' and reviewed':''} candidate. Previous working version is preserved.`);
       cursor.phase='committing';await checkpoint('running');
       const current=await snapshot();
       const currentRevision=await revisionHash(current.files);
@@ -457,14 +488,41 @@ export async function createAdSession(options: AdSessionOptions) {
       if(currentRevision!==bestRevision)await commitSnapshot(current,best);
       const approved=!!best.review && best.review.score>=runPolicy.minScore&&(!runPolicy.requireNoMajorIssues||!best.review.issues.some(i=>i.severity!=='minor'));
       const pendingVoiceovers=best.project.tracks.flatMap(track=>track.clips).filter(clip=>clip.kind==='voiceover'&&!original.project.tracks.some(track=>track.clips.some(previous=>previous.id===clip.id)));
-      const message=(!best.review?'Updated design ready. Render checked; reviewer was off.':approved?'Reviewed design ready.':`Best reviewed version retained; further review needed (${best.review.score}/10).`)+(pendingVoiceovers.length?' Voiceover script added to the timeline. Click its ! clip to read/edit and record your voice line by line; no voiceover audio has been recorded yet.':'');
+      const message=(!best.review?'Updated design ready. Render checked; reviewer was off.':approved?'Reviewed design ready.':`Best reviewed version retained; further review needed (${best.review.score}/10).`)+(refinementFailure?' Further refinement stopped: '+refinementFailure.slice(0,500):'')+(pendingVoiceovers.length?' Voiceover script added to the timeline. Click its ! clip to read/edit and record your voice line by line; no voiceover audio has been recorded yet.':'');
       if(conversation.at(-1)?.role!=='assistant'||conversation.at(-1)?.content!==message)conversation.push({role:'assistant',content:message});await fs.writeFile('/chat.json',JSON.stringify(conversation));await checkpoint(!best.review||approved?'complete':'needs_review',{review:best.review});
       emit({type:'preview',runId});emit({type:'complete',runId,message,review:best.review}); return {message,approved,review:best.review,runId};
     } catch(e) {const cancelled=signal.aborted; if(candidate && original && !persistenceFailed && !cursor.pending)await checkpoint(cancelled?'cancelled':'error',{error:String(e)});emit({type:cancelled?'cancelled':'error',runId,message:String(e)});throw e;}
     finally {external?.removeEventListener('abort',abort);controller=undefined;active=false;liveInputs=undefined;emit({type:'preview'});}
   };
+  const restoreRunDraft=async(runId:string)=>{
+    if(active)throw new Error('Wait for or cancel the active run before restoring a draft');
+    if(!/^[A-Za-z0-9_-]+$/.test(runId))throw new Error('Invalid run ID');
+    active=true;
+    try {
+      const record=JSON.parse(await read(fs,`/runs/${runId}/run.json`));
+      if(typeof record.checkpoint!=='string'||!record.checkpoint.startsWith(`/runs/${runId}/checkpoints/`)||normalizePath(record.checkpoint)!==record.checkpoint)throw new Error('This run has no saved draft checkpoint');
+      const state=JSON.parse(await read(fs,record.checkpoint)) as Recovery;
+      if(state.schemaVersion!==1||state.runId!==runId)throw new Error('Invalid run checkpoint');
+      const selected=loadCandidate(state.best??state.lastCandidate);if(!selected)throw new Error('This run has no successfully rendered draft to restore');
+      if(typeof selected.source!=='string'||typeof selected.plan!=='string')throw new Error('Invalid saved draft');
+      validateFiles(selected.files);assertValidProject(selected.project);assertValidProject(state.original.project);if(state.original.files)validateFiles(state.original.files);if(selected.review)reviewSchema.parse(selected.review);
+      const before=await snapshot();const desired=await snapshotFiles(selected);
+      const currentRevision=await revisionHash(before.files);const originalRevision=await revisionHash(await snapshotFiles(state.original));const draftRevision=await revisionHash(desired);
+      if(currentRevision!==originalRevision&&currentRevision!==draftRevision)throw new Error('Project changed since this run began; restoring the draft would overwrite newer edits. Save or undo those edits first.');
+      // Revalidate saved files locally, without invoking planner, designer, reviewer, or providers.
+      const staged=await stagedSession();const keep=new Set(desired.map(file=>file.path));
+      for(const file of await revisionFiles(staged.filesystem))if(!keep.has(file.path))await staged.filesystem.remove(file.path);
+      await writeFiles(staged.filesystem,desired);await validateSession(staged);
+      if(currentRevision!==draftRevision)await commitSnapshot(before,selected);
+      const message=selected.review?`Restored saved draft (${selected.review.score}/10). No new generation or review was run.`:`Restored saved rendered draft. ${state.reviewEnabled?'Review was not completed. ':''}No new generation or review was run.`;
+      await fs.writeFile(`/runs/${runId}/run.json`,JSON.stringify({...record,status:'restored',restoredAt:Date.now(),restoredCandidate:state.best?'best':'lastCandidate',review:selected.review,message}));
+      if(conversation.at(-1)?.content!==message){conversation.push({role:'assistant',content:message});await fs.writeFile('/chat.json',JSON.stringify(conversation));}
+      await persistRemote();emit({type:'preview',runId});emit({type:'complete',runId,message,review:selected.review});
+      return {runId,restored:true,approved:false,review:selected.review,message};
+    }finally{active=false;emit({type:'preview'});}
+  };
   return {
-    ...base, sceneState,editScenes,editProject,convertToScenes,library, wasmURL:options.wasmURL, projectId:options.projectId, formats, adapters:options.adapters, skills:registry, workspace:{...fs,read:(path:string)=>read(fs,path.startsWith('/')?path:`/${path}`),write:async(path:string,content:string,expectedContent?:string)=>{path=normalizePath(path.startsWith('/')?path:`/${path}`);if(path==='/project.json'||path==='/Ad.tsx'||isProjectModule(path))await manualEdit(undefined,async session=>{if(expectedContent!==undefined&&await read(session.filesystem,path)!==expectedContent)throw new Error('File changed; reload before saving');if(path==='/Ad.tsx'&&(await session.store.load()).composition)throw new Error('Structured scenes render their component modules; edit a scene module instead of Ad.tsx');if(path==='/project.json'){const project=JSON.parse(content);assertValidProject(project);await session.store.save(project);}else await session.filesystem.writeFile(path,content,{createParents:true});},expectedContent!==undefined);else {if(active)throw new Error('Wait for the active run');await fs.writeFile(path,content,{createParents:true});emit({type:'preview'});}}},
+    ...base, sceneState,editScenes,editProject,convertToScenes,library,restoreRunDraft, wasmURL:options.wasmURL, projectId:options.projectId, formats, adapters:options.adapters, skills:registry, workspace:{...fs,read:(path:string)=>read(fs,path.startsWith('/')?path:`/${path}`),write:async(path:string,content:string,expectedContent?:string)=>{path=normalizePath(path.startsWith('/')?path:`/${path}`);if(path==='/project.json'||path==='/Ad.tsx'||isProjectModule(path))await manualEdit(undefined,async session=>{if(expectedContent!==undefined&&await read(session.filesystem,path)!==expectedContent)throw new Error('File changed; reload before saving');if(path==='/Ad.tsx'&&(await session.store.load()).composition)throw new Error('Structured scenes render their component modules; edit a scene module instead of Ad.tsx');if(path==='/project.json'){const project=JSON.parse(content);assertValidProject(project);await session.store.save(project);}else await session.filesystem.writeFile(path,content,{createParents:true});},expectedContent!==undefined);else {if(active)throw new Error('Wait for the active run');await fs.writeFile(path,content,{createParents:true});emit({type:'preview'});}}},
     async addAssets(assets: NonNullable<AdSessionOptions['assets']>){if(active)throw new Error('Wait for the active run');for(const asset of assets)await base.importAsset(asset.metadata,asset.data);emit({type:'preview'});},
     get busy(){return active;}, subscribe(listener:(event:StudioEvent)=>void){listeners.add(listener);return()=>{listeners.delete(listener);};},
     send:(prompt:string, config:{signal?:AbortSignal;review?:boolean;libraryPublish?:boolean}={})=>run(prompt,config.signal,config.review,undefined,config.libraryPublish), cancel:()=>controller?.abort(),

@@ -23,16 +23,16 @@ export const storedProductionPlanSchema = z.preprocess(value => {
     ? {id:null, componentId:null, ...scene} : scene)};
 }, adProductionPlanSchema);
 export type AdProductionPlan = z.infer<typeof adProductionPlanSchema>;
-export function validateProductionPlan(plan: AdProductionPlan, assets: Record<string,string>, duration: number, generated: Record<string,string>) {
+export function validateProductionPlan(plan: AdProductionPlan, assets: Record<string,string>, duration: number, generated: Record<string,string>, options:{validateTiming?:boolean}={}) {
   const keys=new Set(plan.assets.map(a=>a.key));
   if (keys.size!==plan.assets.length) throw new Error("Asset keys must be unique");
   for(const asset of plan.assets) {
-    if(asset.action==="reuse" && (!asset.assetId || !Object.hasOwn(assets,asset.assetId))) throw new Error(`Unknown existing asset for ${asset.key}`);
+    if(asset.action==="reuse" && (!asset.assetId || !Object.hasOwn(assets,asset.assetId))) throw new Error(`Unknown existing asset for ${asset.key}: ${asset.assetId??'no asset ID'}. Reuse an actual image asset ID (${Object.keys(assets).join(', ')||'none available'}); code-drawn visuals are not image assets.`);
     if(asset.action==="generate" && asset.assetId && generated[asset.key]!==asset.assetId) throw new Error(`Use the generated asset ID returned for ${asset.key}`);
   }
   const ids=new Set<string>();
   for(const scene of plan.scenes) {
-    if(scene.end<=scene.start || scene.end>duration) throw new Error(`Scene timing must fit within 0–${duration}s`);
+    if(options.validateTiming!==false&&(scene.end<=scene.start || scene.end>duration)) throw new Error(`Scene timing must fit within 0–${duration}s`);
     if(scene.id){if(ids.has(scene.id))throw new Error("Scene IDs must be unique");ids.add(scene.id);}
     if(scene.assetKeys.some(key=>!keys.has(key))) throw new Error("Scene references an unknown asset key");
 

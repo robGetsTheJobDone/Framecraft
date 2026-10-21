@@ -64,7 +64,7 @@ describe('embeddable ad session',()=>{
   const original=new TextDecoder().decode(await session.workspace.readFile('/Ad.tsx'));
   const events:string[]=[];session.subscribe(e=>events.push(e.type));
   const result=await session.send('Make a clear ad');
-  expect(result.approved).toBe(true);expect(JSON.parse(await session.workspace.read('plan.json')).concept).toBe('A clear ad');expect(renders).toBe(2);expect(fake.stats().plans).toBe(2);expect(fake.stats().reviews).toBe(2);
+  expect(result.approved).toBe(true);expect(JSON.parse(await session.workspace.read('plan.json')).concept).toBe('A clear ad');expect(renders).toBe(2);expect(fake.stats().plans).toBe(1);expect(fake.stats().reviews).toBe(2);
   expect(JSON.stringify(fake.stats().evidence)).toContain('data:image/png;base64,cGl4ZWxz');
   expect(events).toContain('review');expect((await session.listRuns())[0].status).toBe('complete');
   expect(new TextDecoder().decode(await session.workspace.readFile('/Ad.tsx'))).toBe(source(2));
@@ -81,7 +81,7 @@ describe('embeddable ad session',()=>{
   session=await createAdSession(options);
   const result=await session.send('Make DEMAIS red after a second');
   expect(result.review).toBeUndefined();expect(result.approved).toBe(false);
-  expect(fake.stats().reviews).toBe(2);expect(fake.stats().plans).toBe(2);expect(renders).toBe(3);
+  expect(fake.stats().reviews).toBe(2);expect(fake.stats().plans).toBe(1);expect(renders).toBe(3);
   expect((await session.workspace.list('/runs',{recursive:true})).some(file=>file.path.endsWith('/edit-plan.json'))).toBe(true);
   await session.send('Review the edit',{review:true});
   expect(fake.stats().reviews).toBe(3);

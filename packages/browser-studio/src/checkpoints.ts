@@ -1,4 +1,5 @@
 import {normalizePath, type BrowserFileSystem} from '@deepbench/browser-filesystem';
+import {isBase64} from './base64-validation.js';
 
 /** Implement save as an atomic compare-and-swap (e.g. ETag/If-Match). Never silently overwrite. */
 export interface CheckpointAdapter {
@@ -32,7 +33,7 @@ export function validateFiles(value: unknown): asserts value is WorkspaceFiles {
   if (!Array.isArray(value) || value.length > 10000) throw new Error('Invalid checkpoint files');
   const paths = new Set<string>();
   for (const file of value) {
-    if (!file || typeof file.path !== 'string' || normalizePath(file.path) !== file.path || file.path === '/' || paths.has(file.path) || typeof file.data !== 'string' || !/^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/.test(file.data)) throw new Error('Invalid checkpoint file');
+    if (!file || typeof file.path !== 'string' || normalizePath(file.path) !== file.path || file.path === '/' || paths.has(file.path) || !isBase64(file.data)) throw new Error('Invalid checkpoint file');
     paths.add(file.path);
   }
 }

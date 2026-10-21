@@ -120,6 +120,10 @@ Insertion requires a structured scene project. It copies the exact code/assets i
 
 In the UI, **Save to brand library** is explicit authorization. For an agent request that should publish, the host must pass `session.send(prompt, {libraryPublish:true})`, or the user can enable **Allow library publishing for this request** in the chat. This grants publishing only to that request and its recovery in the same live session. After restoring a checkpoint, publishing requires fresh host authorization through `session.resume(runId, {libraryPublish:true})`; a saved checkpoint cannot grant permission. Ordinary generation does not grant publishing permission.
 
+## Recover a rendered draft
+
+If a run fails after producing a valid draft, use **Restore saved draft** next to its interrupted-run controls, or call `session.restoreRunDraft(runId)`. This restores the saved scene modules, project data, music, and assets without another model call. It participates in undo and rejects restoration over a project changed since that run. A restored draft retains its review status; restoration does not mean visual approval.
+
 ## Validation and compatibility
 
 - Scene edits, component/module changes, library insertions/upgrades, and their dependency metadata share revision history and rollback.
