@@ -164,6 +164,12 @@ const context = {
 
 The optional `@framecraft/studio/node` entry point exports `loadContextFiles()` for loading selected files in Node. Files are reference material, not executable plugin imports. Context travels with saved sessions; include only files intended for the agent and archive.
 
+## Browser loading
+
+The npm build is minified and preserves dynamic imports. Monaco loads when Files is opened, Tone loads when synthesizing music, and the composition renderer loads on its first use. Optional encoder chunks load as needed. The compiler WASM is shipped locally and loaded when compiling a composition. Mounting the studio starts a preview, so rendering and compilation are needed at that point.
+
+Keep the generated JavaScript chunks, CSS, worker, and WASM available when bundling or deploying the package. Splitting reduces the initial JavaScript load; it does not remove the compiler from the npm download.
+
 ## Current limits
 
 - `Ad.tsx` owns source-mode visuals; the timeline owns audio and pending voiceover. Visual timeline edits are not automatically translated into composition code.

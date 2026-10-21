@@ -6,7 +6,7 @@ React 19 UI plus a browser-local workspace, TSX compiler, isolated Remotion prev
 
 Run `pnpm dev`, then open http://localhost:5180/?mode=ad for the source studio. The default URL opens the source studio; `?mode=timeline` opens the legacy timeline playground. Only the playground gateway reads the root `.env`; the package has no server dependency.
 
-Run `pnpm pack:studio` to build `framecraft-studio-0.1.0.tgz`. In another project, run `pnpm add /absolute/path/to/framecraft-studio-0.1.0.tgz`. The artifact contains bundled workspace JavaScript, local declarations, CSS, and esbuild WASM, with no workspace-protocol dependencies. React and React DOM are host peers. Mount client-side using a browser bundler such as Vite; SSR is not supported.
+Run `pnpm pack:studio` to build `framecraft-studio-0.1.1.tgz`. In another project, run `pnpm add /absolute/path/to/framecraft-studio-0.1.1.tgz`. The artifact contains bundled workspace JavaScript, local declarations, CSS, and esbuild WASM, with no workspace-protocol dependencies. React and React DOM are host peers. Mount client-side using a browser bundler such as Vite; SSR is not supported.
 
 ```tsx
 import {Studio} from '@framecraft/studio';

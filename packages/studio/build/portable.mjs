@@ -9,10 +9,13 @@ const internal=manifests.map(m=>m.name);
 const dependencies={};
 for(const m of manifests)for(const [name,version]of Object.entries(m.dependencies??{}))if(!internal.includes(name)&&!['react','react-dom'].includes(name))dependencies[name]=version;
 const studioManifest=manifests.find(m=>m.name==='@deepbench/studio');
-const dir='packages/studio/portable';await rm(dir,{recursive:true,force:true});await mkdir(dir,{recursive:true});
-await build({entryPoints:['packages/studio/src/index.tsx'],outfile:dir+'/index.js',bundle:true,format:'esm',platform:'browser',target:'es2022',external:['react','react/*','react-dom','react-dom/*'],loader:{'.ttf':'file'},define:{'process.env.NODE_ENV':'"production"'}});
+const dir='packages/studio/portable';await mkdir(dir,{recursive:true});
+// Keep the output directory inode intact for terminals opened here.
+for (const entry of await readdir(dir)) await rm(resolve(dir,entry),{recursive:true,force:true});
+const browserBuild=await build({entryPoints:{index:'packages/studio/src/index.tsx'},outdir:dir,chunkNames:'[name]-[hash]',splitting:true,minify:true,keepNames:true,metafile:true,legalComments:'linked',bundle:true,format:'esm',platform:'browser',target:'es2022',external:['react','react/*','react-dom','react-dom/*'],loader:{'.ttf':'file'},define:{'process.env.NODE_ENV':'"production"'}});
+await writeFile('packages/studio/dist/portable-meta.json',JSON.stringify(browserBuild.metafile));
 // Keep Node filesystem imports isolated behind the optional /node subpath.
-await build({entryPoints:['packages/studio/src/node.ts'],outfile:dir+'/node.js',bundle:true,format:'esm',platform:'node',target:'node22'});
+await build({entryPoints:['packages/studio/src/node.ts'],outfile:dir+'/node.js',bundle:true,format:'esm',platform:'node',target:'node22',minify:true,legalComments:'inline'});
 // Preserve declaration modules and rewrite workspace references to local files.
 for (let i=0;i<names.length;i++) {
  const name=names[i]; const typeDir=dir+'/types/'+name; await mkdir(typeDir,{recursive:true});
@@ -38,5 +41,5 @@ await copyFile('packages/studio/README.md',dir+'/README.md');
 await writeFile(dir+'/styles.css', (await readFile(dir+'/index.css','utf8')) + '\n' + (await readFile('packages/studio/src/styles.css','utf8')));
 await copyFile('packages/studio/dist/monaco-editor.worker.js',dir+'/monaco-editor.worker.js');
 await copyFile('packages/browser-ad-renderer/dist/esbuild.wasm',dir+'/esbuild.wasm');
-await writeFile(dir+'/package.json',JSON.stringify({name:'@framecraft/studio',version:studioManifest.version,description:'Browser-first AI video studio with editable Remotion ads, music and portable sessions',repository:{type:'git',url:'git+https://github.com/robGetsTheJobDone/DeepBench.git',directory:'packages/studio'},publishConfig:{access:'public'},files:['*.js','*.css','*.d.ts','*.wasm','*.ttf','types','README.md'],type:'module',exports:{'.':{types:'./index.d.ts',import:'./index.js'},'./node':{types:'./node.d.ts',import:'./node.js'},'./styles.css':'./styles.css','./esbuild.wasm':'./esbuild.wasm'},sideEffects:['*.css'],peerDependencies:{react:'^19.0.0','react-dom':'^19.0.0'},dependencies},null,2));
+await writeFile(dir+'/package.json',JSON.stringify({name:'@framecraft/studio',version:studioManifest.version,description:'Browser-first AI video studio with editable Remotion ads, music and portable sessions',repository:{type:'git',url:'git+https://github.com/robGetsTheJobDone/DeepBench.git',directory:'packages/studio'},publishConfig:{access:'public'},files:['*.js','*.css','*.d.ts','*.wasm','*.ttf','*.txt','types','README.md'],type:'module',exports:{'.':{types:'./index.d.ts',import:'./index.js'},'./node':{types:'./node.d.ts',import:'./node.js'},'./styles.css':'./styles.css','./esbuild.wasm':'./esbuild.wasm'},sideEffects:['*.css'],peerDependencies:{react:'^19.0.0','react-dom':'^19.0.0'},dependencies},null,2));
 console.log('Portable package built at '+dir);
