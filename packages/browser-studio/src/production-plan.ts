@@ -5,10 +5,11 @@ const id = z.string().regex(/^[a-zA-Z0-9_-]{1,60}$/);
 export const adProductionPlanSchema = z.object({
   concept: z.string().min(1).max(600),
   scenes: z.array(z.object({
-    start: z.number().min(0).max(15), end: z.number().min(0.01).max(15),
+    id: id.optional(), componentId: id.optional(),
+    start: z.number().min(0), end: z.number().positive(),
     copy: z.string().max(500), visual: z.string().min(1).max(600), motion: z.string().min(1).max(600),
     assetKeys: z.array(id).max(8),
-  }).strict()).min(1).max(8),
+  }).strict()).min(1).max(64).describe('Choose boundaries for independently editable sections. Keep coordinated animation or transitions in one continuous scene when appropriate; do not force one scene per shot or beat. A single scene is valid.'),
   assets: z.array(z.object({
     key: id, description: z.string().min(1).max(800),
     action: z.enum(["reuse", "generate"]), assetId: id.nullable(),
@@ -23,11 +24,12 @@ export function validateProductionPlan(plan: AdProductionPlan, assets: Record<st
     if(asset.action==="reuse" && (!asset.assetId || !Object.hasOwn(assets,asset.assetId))) throw new Error(`Unknown existing asset for ${asset.key}`);
     if(asset.action==="generate" && asset.assetId && generated[asset.key]!==asset.assetId) throw new Error(`Use the generated asset ID returned for ${asset.key}`);
   }
-  let end=0;
+  const ids=new Set<string>();
   for(const scene of plan.scenes) {
-    if(Math.abs(scene.start-end)>0.01 || scene.end<=scene.start || scene.end>duration) throw new Error(`Scenes must cover 0–${duration}s sequentially without gaps or overlaps`);
+    if(scene.end<=scene.start || scene.end>duration) throw new Error(`Scene timing must fit within 0–${duration}s`);
+    if(scene.id){if(ids.has(scene.id))throw new Error("Scene IDs must be unique");ids.add(scene.id);}
     if(scene.assetKeys.some(key=>!keys.has(key))) throw new Error("Scene references an unknown asset key");
-    end=scene.end;
+
   }
-  if(Math.abs(end-duration)>0.01)throw new Error(`Plan must cover all ${duration}s`);
+  // The plan describes intent, never overwrites authoritative scene arrangement. Gaps and overlaps are valid.
 }

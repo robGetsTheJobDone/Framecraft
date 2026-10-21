@@ -1,3 +1,5 @@
+import {validateComposition, type SceneComposition} from './scenes.js';
+export * from './scenes.js';
 import { FsError, normalizePath, type BrowserFileSystem, type FileStat } from '@deepbench/browser-filesystem';
 
 export interface StudioAsset { id: string; kind: 'audio' | 'video' | 'image'; path: string; mimeType: string; name?: string; durationSeconds?: number; width?: number; height?: number }
@@ -12,7 +14,7 @@ export type StudioClip = AudioClip | VideoClip | TextClip | ImageClip | Voiceove
 export interface StudioTrack { id: string; kind: 'audio' | 'video' | 'text' | 'image' | 'voiceover'; name: string; /** Audio mute only. */ muted?: boolean; gain?: number; clips: StudioClip[] }
 export interface DubbingSegment { id: string; text: string; startSeconds: number; durationSeconds: number; audioAssetId?: string }
 export interface DubbingScript { id: string; title: string; language: string; segments: DubbingSegment[] }
-export interface StudioProject { schemaVersion: 1; id: string; title: string; width: number; height: number; fps: number; durationSeconds: number; assets: StudioAsset[]; tracks: StudioTrack[]; dubbingScripts: DubbingScript[] }
+export interface StudioProject { composition?: SceneComposition; schemaVersion: 1 | 2; id: string; title: string; width: number; height: number; fps: number; durationSeconds: number; assets: StudioAsset[]; tracks: StudioTrack[]; dubbingScripts: DubbingScript[] }
 export interface ValidationIssue { path: string; message: string }
 const record = (v: unknown): v is Record<string, any> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const finite = (v: unknown, min = 0): v is number => typeof v === 'number' && Number.isFinite(v) && v >= min;
@@ -21,7 +23,9 @@ export function validateProject(value: unknown): ValidationIssue[] {
   const issues: ValidationIssue[] = [];
   const fail = (path: string, message: string) => issues.push({ path, message });
   if (!record(value)) return [{ path: '', message: 'Expected project object' }];
-  if (value.schemaVersion !== 1) fail('schemaVersion', 'Unsupported schema version');
+  if (value.schemaVersion !== 1 && value.schemaVersion !== 2) fail('schemaVersion', 'Unsupported schema version');
+  if (value.schemaVersion === 1 && value.composition !== undefined) fail('composition', 'Structured compositions require schemaVersion 2');
+  if (value.schemaVersion === 2 && value.composition === undefined) fail('composition', 'Schema version 2 requires a scene composition');
   if (!idValid(value.id)) fail('id', 'Expected nonempty safe identifier');
   if (typeof value.title !== 'string') fail('title', 'Expected string');
   for (const key of ['width', 'height']) if (!Number.isInteger(value[key]) || value[key] <= 0) fail(key, 'Expected positive integer');
@@ -90,6 +94,7 @@ export function validateProject(value: unknown): ValidationIssue[] {
     unique(s.segments, `${p}.segments`);
     s.segments.forEach((seg: unknown, j: number) => { if (!record(seg)) return; const sp = `${p}.segments.${j}`; timed(seg,sp); if (typeof seg.text !== 'string') fail(`${sp}.text`, 'Expected string'); if (seg.audioAssetId !== undefined && assets.get(seg.audioAssetId)?.kind !== 'audio') fail(`${sp}.audioAssetId`, 'Missing audio asset'); });
   });
+  if (value.composition !== undefined) for (const issue of validateComposition(value.composition, {durationInFrames: Math.round(value.durationSeconds * value.fps), assetIds: new Set(assets.keys())})) fail(`composition${issue.path ? '.' + issue.path : ''}`, issue.message);
   return issues;
 }
 export function assertValidProject(value: unknown): asserts value is StudioProject {
@@ -187,7 +192,7 @@ export function createProjectStore(fs: BrowserFileSystem, conversationId: string
       for (const path of ['/assets','/exports','/revisions']) await filesystem.mkdir(path,{recursive:true});
       for (const [path,content] of [
         ['/brief.md','# Video brief\n\nDescribe the audience, goal, tone, and desired duration.\n'],
-        ['/AGENTS.md','# Studio editing rules\n\nEdit /project.json using schemaVersion 1. All times are seconds. Preserve existing assets. Audio/video sourceStartSeconds defines trim. Mute affects audio only. Validate before preview/export. Provider credentials belong to the application, never project files.\n'],
+        ['/AGENTS.md','# Studio editing rules\n\nEdit /project.json using schemaVersion 1 for legacy projects or schemaVersion 2 for structured scene projects. Structured scenes use integer frames; legacy media and audio times are seconds. Preserve existing assets. Audio/video sourceStartSeconds defines trim. Mute affects audio only. Validate before preview/export. Provider credentials belong to the application, never project files.\n'],
       ]) { try { await filesystem.writeFile(path,content,{exclusive:true}); } catch (error) { if (!isFsCode(error,'EEXIST')) throw error; } }
       return current;
     },

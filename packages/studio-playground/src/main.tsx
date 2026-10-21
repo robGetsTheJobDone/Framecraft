@@ -3,11 +3,12 @@ import {useEffect, useMemo, useState} from 'react';
 import {IndexedDBFileSystem} from '@deepbench/browser-filesystem';
 import {openStudioSession, type StudioSession} from '@deepbench/browser-studio';
 import {StudioView} from '@deepbench/studio/view';
-import {Studio} from '@deepbench/studio';
+import {Studio, createFileSystemComponentLibrary} from '@deepbench/studio';
 import '@deepbench/studio/styles.css';
 import {loadPierogiAssets, pierogiBrand} from './pierogi';
 import {checkedURL, createProviders, serverImageProvider, type Connection} from './providers';
 const disk = new IndexedDBFileSystem({databaseName: 'deepbench-playground'});
+const componentLibrary = createFileSystemComponentLibrary(new IndexedDBFileSystem({databaseName:'framecraft-brand-library'}), {workspaceId:'local-brand'});
 const sessionCache = new Map<string, Promise<StudioSession>>();
 const loadSession = (id: string) => {
   if (!sessionCache.has(id)) sessionCache.set(id, (async () => {
@@ -48,7 +49,7 @@ function App() {
   useEffect(()=>{if(!settingsOpen)return;const previous=document.activeElement as HTMLElement|null;const dialog=document.querySelector<HTMLElement>('[aria-label="Connection settings"]');const items=()=>Array.from(dialog?.querySelectorAll<HTMLElement>('button,input,select,textarea')??[]);items()[0]?.focus();const key=(event:KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();setSettingsOpen(false);}if(event.key==='Tab'){const all=items();if(event.shiftKey&&document.activeElement===all[0]){event.preventDefault();all.at(-1)?.focus();}else if(!event.shiftKey&&document.activeElement===all.at(-1)){event.preventDefault();all[0]?.focus();}}};document.addEventListener('keydown',key);return()=>{document.removeEventListener('keydown',key);previous?.focus();};},[settingsOpen]);
   const settings=settingsOpen?<div className="modal-backdrop"><section className="modal" role="dialog" aria-modal="true" aria-label="Connection settings"><button className="close-modal" aria-label="Close dialog" onClick={()=>setSettingsOpen(false)}>×</button><Settings current={connection} serverConnection={serverConnection} onSave={value=>{setConnection(value);setSettingsOpen(false);}}/></section></div>:undefined;
   if(new URLSearchParams(location.search).get('mode')!=='timeline' && !seedAssets) return <div role={seedError?'alert':'status'}>{seedError||'Loading Pierogi logo…'}</div>;
-  if(new URLSearchParams(location.search).get('mode')!=='timeline') return <Studio onImported={session=>{setConversations(items=>[...items,{id:session.projectId,name:'Imported film'}]);setActive(session.projectId);}} conversations={conversations} onSelectProject={setActive} onNewProject={()=>{const id=crypto.randomUUID();setConversations(items=>[...items,{id,name:`Film ${items.length+1}`}]);setActive(id);}} assets={seedAssets} brand={pierogiBrand} projectId={projectId} initialBrief="Create an editable animated ad from the user's brief." adapters={adapters} formats={[{id:'story',width:1080,height:1920},{id:'feed',width:1080,height:1350}]} />;
+  if(new URLSearchParams(location.search).get('mode')!=='timeline') return <Studio onImported={session=>{setConversations(items=>[...items,{id:session.projectId,name:'Imported film'}]);setActive(session.projectId);}} conversations={conversations} onSelectProject={setActive} onNewProject={()=>{const id=crypto.randomUUID();setConversations(items=>[...items,{id,name:`Film ${items.length+1}`}]);setActive(id);}} assets={seedAssets} brand={pierogiBrand} projectId={projectId} initialBrief="Create an editable animated ad from the user's brief." adapters={{...adapters,componentLibrary}} libraryWorkspaceId="local-brand" formats={[{id:'story',width:1080,height:1920},{id:'feed',width:1080,height:1350}]} />;
   return <StudioView projectId={projectId} loadSession={loadSession} providers={providers} conversations={conversations} onSelectProject={setActive} onNewProject={()=>{const id=crypto.randomUUID();setConversations(items=>[...items,{id,name:`Film ${items.length+1}`}]);setActive(id);}} connectionLabel={connection===serverConnection&&connection?'OpenAI connected':connection?'Connected model':'Demo mode'} demo={!connection} imageGeneration={!!serverConnection} onSettings={()=>setSettingsOpen(true)} settings={settings}/>;
 }
 function Settings({current, serverConnection, onSave}: {serverConnection: Connection | null; current: Connection | null; onSave(value: Connection | null): void}) {

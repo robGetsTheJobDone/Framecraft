@@ -1,8 +1,10 @@
+import {validateComposition, sceneReviewFrames, type SceneComposition} from '@deepbench/studio-project';
+import {createSceneBuildOptions, sceneCompilationKey} from './module-graph.js';
 import {Output, BufferTarget, Mp4OutputFormat, WebMOutputFormat, CanvasSource, AudioBufferSource, canEncodeVideo, canEncodeAudio} from 'mediabunny';
 import * as esbuild from 'esbuild-wasm';
 import {harnessCode, tailwindCode} from './harness-code.js';
 export interface AdFormat {id: string; width: number; height: number}
-export interface AdRenderInput {source: string; assets: Record<string, string>; format: AdFormat; durationSeconds: number; fps: number; audioMix?: string}
+export interface AdRenderInput {modules?: Record<string, string>; composition?: SceneComposition; source: string; assets: Record<string, string>; format: AdFormat; durationSeconds: number; fps: number; audioMix?: string}
 export interface AdFrame {format: string; timeSeconds: number; dataUrl: string}
 let initialized: Promise<void> | undefined;
 let aacFallback: Promise<void> | undefined;
@@ -13,11 +15,31 @@ export async function compileAd(source: string, wasmURL = new URL('./esbuild.was
   const result = await esbuild.transform(source, {loader: 'tsx', format: 'cjs', target: 'es2022', jsx: 'transform', sourcefile: 'Ad.tsx'});
   return result.code;
 }
+const sceneCache = new Map<string, string>();
+export async function compileSceneModules(modules: Record<string, string>, composition: SceneComposition, wasmURL = new URL('./esbuild.wasm', import.meta.url).href) {
+  modules = {...modules};
+  composition = structuredClone(composition);
+  const options = createSceneBuildOptions(modules, composition);
+  const key = sceneCompilationKey(modules, composition);
+  const cached = sceneCache.get(key); if (cached !== undefined) return cached;
+  initialized ??= esbuild.initialize({wasmURL}).catch(error => {initialized = undefined; throw error;});
+  await initialized;
+  const result = await esbuild.build(options);
+  const code = result.outputFiles![0].text;
+  if (sceneCache.size >= 4) sceneCache.delete(sceneCache.keys().next().value!);
+  sceneCache.set(key, code); return code;
+}
 const escapeScript = (code: string) => code.replace(/<\/script/gi, '<\\/script');
 export async function mountAd(container: HTMLElement, input: AdRenderInput, options: {mode?: 'preview' | 'review' | 'export'; container?: 'mp4' | 'webm'; signal?: AbortSignal; wasmURL?: string; onProgress?(progress: number): void} = {}) {
   options.signal?.throwIfAborted();
+  input = structuredClone(input);
   for (const value of [input.format.width, input.format.height, input.fps, input.durationSeconds]) if (!Number.isFinite(value) || value <= 0) throw new Error('Invalid composition dimensions or duration');
-  const code = await compileAd(input.source, options.wasmURL);
+  const frameCount = Math.max(1, Math.round(input.durationSeconds * input.fps));
+  if (input.composition) {
+    const issues = validateComposition(input.composition, {durationInFrames: frameCount, assetIds: new Set(Object.keys(input.assets))});
+    if (issues.length) throw new Error(issues.map(i => `${i.path}: ${i.message}`).join('; '));
+  }
+  const code = input.composition ? await compileSceneModules(input.modules ?? {}, input.composition, options.wasmURL) : await compileAd(input.source, options.wasmURL);
   options.signal?.throwIfAborted();
   const frame = document.createElement('iframe'); frame.title = 'Ad composition'; frame.setAttribute('sandbox', 'allow-scripts');
   frame.style.cssText = `border:0;width:100%;aspect-ratio:${input.format.width}/${input.format.height};background:#fff;`;
@@ -39,7 +61,7 @@ export async function mountAd(container: HTMLElement, input: AdRenderInput, opti
     };
   });
   // A private transferred port connects this iframe to this render operation.
-  frame.onload = () => frame.contentWindow?.postMessage({type: 'deepbench-render', config: {...input, code, mode: options.mode ?? 'preview', container: options.container ?? 'mp4'}}, '*', [channel.port2]);
+  frame.onload = () => frame.contentWindow?.postMessage({type: 'deepbench-render', config: {...input, reviewFrames: input.composition ? sceneReviewFrames(input.composition, frameCount) : undefined, code, mode: options.mode ?? 'preview', container: options.container ?? 'mp4'}}, '*', [channel.port2]);
   frame.srcdoc = `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' blob:; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; connect-src 'none'; worker-src blob:;"><style>html,body{margin:0;}*{box-sizing:border-box}#root{overflow:hidden}*,*::before,*::after{animation:none!important;transition:none!important}</style><script>for(const key of ['localStorage','sessionStorage']){const values=new Map();Object.defineProperty(window,key,{value:{getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,String(v)),removeItem:k=>values.delete(k),clear:()=>values.clear(),key:i=>[...values.keys()][i]??null,get length(){return values.size}}});}</script><script>${escapeScript(tailwindCode)}</script></head><body><div id="root"></div><script>${escapeScript(harnessCode)}</script></body></html>`;
   container.append(frame); options.signal?.addEventListener('abort', abort, {once: true});
   if (options.signal?.aborted) dispose();
@@ -51,6 +73,7 @@ export async function mountAd(container: HTMLElement, input: AdRenderInput, opti
   })};
 }
 export async function renderAd(input: AdRenderInput, options: {mode: 'review' | 'export'; container?: 'mp4' | 'webm'; signal?: AbortSignal; wasmURL?: string; onProgress?(progress: number): void}) {
+  input = structuredClone(input);
   const container = document.createElement('div'); container.style.cssText = `position:fixed;left:-20000px;top:0;width:${input.format.width}px;pointer-events:none;`; document.body.append(container);
   let mounted: Awaited<ReturnType<typeof mountAd>> | undefined;
   try {

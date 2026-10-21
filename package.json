@@ -13,7 +13,8 @@
     "test:files": "pnpm --filter '@deepbench/studio-playground^...' build && node scripts/workspace-files-smoke.mjs",
     "test:embedded": "pnpm build && node scripts/embedded-studio-smoke.mjs",
     "pack:studio": "pnpm build && node packages/studio/build/portable.mjs && pnpm --dir packages/studio/portable pack --pack-destination ../../../",
-    "test:react18": "node scripts/react-compat-smoke.mjs"
+    "test:react18": "node scripts/react-compat-smoke.mjs",
+    "test:scenes": "pnpm build && node packages/studio/build/portable.mjs && pnpm --filter @deepbench/browser-ad-renderer test:browser && node scripts/component-library-browser-smoke.mjs && node scripts/scenes-portable-smoke.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.64.1",

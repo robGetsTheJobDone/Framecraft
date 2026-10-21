@@ -49,8 +49,8 @@ export function useWorkspace(session: StudioSession | undefined, onProject: (pro
   return {files, changes, error, refresh: () => setTick(t => t + 1), clearChanges: () => setChanges([])};
 }
 
-type Props = {session: StudioSession; files: FileStat[]; busy: boolean; target?: string; refresh(): void; onDirtyChange(dirty: boolean): void};
-export function WorkspaceFiles({session, files, busy, target, refresh, onDirtyChange}: Props) {
+type Props = {saveFile?(path:string,content:string,expectedContent:string):Promise<void>; session: StudioSession; files: FileStat[]; busy: boolean; target?: string; refresh(): void; onDirtyChange(dirty: boolean): void};
+export function WorkspaceFiles({session, files, busy, target, refresh, onDirtyChange, saveFile}: Props) {
   const [path, setPath] = useState(target ?? (files.some(file => file.path === '/Ad.tsx') ? '/Ad.tsx' : '/brief.md'));
   const [loaded, setLoaded] = useState<{path: string; text?: string; url?: string; mime: string; editable: boolean}>();
   const [draft, setDraft] = useState('');
@@ -80,7 +80,7 @@ export function WorkspaceFiles({session, files, busy, target, refresh, onDirtyCh
       if (stopped) return;
       if (isText) {
         const text = new TextDecoder('utf-8', {fatal: true}).decode(bytes);
-        const editable = !['/revisions/','/runs/','/skills/','/context/'].some(prefix=>path.startsWith(prefix)) && !['/chat.json','/history.json'].includes(path);
+        const editable = !['/revisions/','/runs/','/skills/','/context/'].some(prefix=>path.startsWith(prefix)) && !['/chat.json','/history.json','/component-library-lock.json','/.scene-transaction.json'].includes(path);
         setOriginal(text); setDraft(text); setLoaded({path, text, mime, editable});
       } else {
         url = URL.createObjectURL(new Blob([new Uint8Array(bytes)], {type: mime}));
@@ -96,7 +96,8 @@ export function WorkspaceFiles({session, files, busy, target, refresh, onDirtyCh
     if (content === original || !loaded?.editable || busy || saving) return;
     setSaving(true); setError('');
     try {
-      if (path === '/project.json') {
+      if (saveFile) await saveFile(path,content,original);
+      else if (path === '/project.json') {
         const project: unknown = JSON.parse(content); assertValidProject(project);
         await session.store.save(project, {expectedProjectJson: JSON.stringify(JSON.parse(original))});
       } else await session.filesystem.writeFile(path, content, {expectedContent: original});

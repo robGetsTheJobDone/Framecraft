@@ -269,3 +269,6 @@ export {CheckpointConflictError, UncertainToolCallError} from './checkpoints.js'
 export type {CheckpointAdapter} from './checkpoints.js';
 
 export {createZipFileAdapter, snapshotToZip, zipToSnapshot} from './zip.js';
+
+export type {SceneOperation, SceneEdit} from './scene-session.js';
+export * from './component-library.js';
