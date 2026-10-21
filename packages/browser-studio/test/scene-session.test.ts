@@ -19,6 +19,14 @@ async function seed(session:Awaited<ReturnType<typeof createAdSession>>) {
  await session.editScenes({baseRevision:state.revision,operations:[{type:'addComponent',component,source},{type:'addScene',scene:scene('one')},{type:'addScene',scene:scene('two',90)}]});
 }
 describe('structured scene editing',()=>{
+ it('starts fresh projects in scene mode and preserves existing source projects on reopen',async()=>{
+   const config=options('fresh');const session=await createAdSession(config);
+   expect((await session.store.load()).schemaVersion).toBe(2);expect((await session.sceneState()).composition).toEqual({version:1,components:[],scenes:[]});
+   const reopened=await createAdSession({...config,initialMode:'source'});expect((await reopened.store.load()).schemaVersion).toBe(2);
+   const legacyConfig=options('legacy');const legacy=await createAdSession({...legacyConfig,initialMode:'source'});await legacy.workspace.write('/Ad.tsx',source);
+   const before=await legacy.sceneState();expect((await legacy.store.load()).schemaVersion).toBe(1);
+   const legacyReopened=await createAdSession(legacyConfig);expect(await legacyReopened.sceneState()).toEqual(before);expect((await legacyReopened.store.load()).schemaVersion).toBe(1);expect(await legacyReopened.workspace.read('/Ad.tsx')).toBe(source);
+ });
  it('moves and edits props without rewriting source; restores full graph through undo and ZIP',async()=>{
    const config=options();const session=await createAdSession(config);await seed(session);
    let state=await session.sceneState();const originalModules=state.modules;
@@ -34,7 +42,7 @@ describe('structured scene editing',()=>{
  });
  it('requires scene support opt-in from custom legacy render adapters',async()=>{
    const config=options();const {renderSupportsScenes,...adapters}=config.adapters;const session=await createAdSession({...config,adapters});
-   await expect(seed(session)).rejects.toThrow('renderSupportsScenes');expect((await session.sceneState()).composition).toBeNull();
+   await expect(seed(session)).rejects.toThrow('renderSupportsScenes');expect((await session.sceneState()).composition?.scenes).toEqual([]);
  });
  it('rejects stale edits and failed validation without changing the working revision',async()=>{
    const session=await createAdSession(options());await seed(session);const old=await session.sceneState();
@@ -47,7 +55,7 @@ describe('structured scene editing',()=>{
    expect(await session.sceneState()).toEqual(before);
  });
  it('converts legacy only explicitly and restores legacy behavior on undo',async()=>{
-   const session=await createAdSession(options());await session.workspace.write('/Ad.tsx',source);
+   const session=await createAdSession({...options(),initialMode:'source'});await session.workspace.write('/Ad.tsx',source);
    expect((await session.sceneState()).composition).toBeNull();await session.convertToScenes();
    const input=(await session.renderInputs())[0];expect(input.composition?.scenes).toHaveLength(1);expect(input.modules?.['/scenes/LegacyComposition.tsx']).toBe(source);
    await session.undo();expect((await session.renderInputs())[0].composition).toBeUndefined();expect(await session.workspace.read('/Ad.tsx')).toBe(source);
@@ -62,7 +70,7 @@ describe('structured scene editing',()=>{
  });
  it('undo preserves assets imported before the first scene edit',async()=>{
    const session=await createAdSession(options());await session.addAssets([{metadata:{id:'uploaded',kind:'image',mimeType:'image/png',name:'Existing'},data:new Uint8Array([1,2,3])}]);
-   await seed(session);await session.undo();expect((await session.store.load()).assets.some(asset=>asset.id==='uploaded')).toBe(true);expect((await session.sceneState()).composition).toBeNull();
+   await seed(session);await session.undo();expect((await session.store.load()).assets.some(asset=>asset.id==='uploaded')).toBe(true);expect((await session.sceneState()).composition?.scenes).toEqual([]);
    expect(await session.workspace.readFile('/assets/uploaded')).toEqual(new Uint8Array([1,2,3]));
  });
  it('manual project edits share history and preserve the module graph',async()=>{
@@ -72,7 +80,7 @@ describe('structured scene editing',()=>{
  });
  it('agent scoped tools commit created modules and preserve manual scene changes',async()=>{
    const config=options();let turn=0;
-   config.adapters.model={withStructuredOutput:(_schema:unknown,{name}:{name:string})=>({invoke:async()=>name==='edit_plan'?{changes:['Change headline'],preserve:['Timing'],needsProductionPlan:false}:{concept:'Cards',scenes:[{start:0,end:8,copy:'Cards',visual:'Cards',motion:'None',assetKeys:[]}],assets:[],nextChanges:['Change headline']}}),bindTools:(tools:any[])=>({invoke:async(messages:any[])=>{
+   config.adapters.model={withStructuredOutput:(_schema:unknown,{name}:{name:string})=>({invoke:async()=>name==='edit_plan'?{changes:['Change headline'],preserve:['Timing'],needsProductionPlan:false}:{concept:'Cards',scenes:[{id:null,componentId:null,start:0,end:8,copy:'Cards',visual:'Cards',motion:'None',assetKeys:[]}],assets:[],nextChanges:['Change headline']}}),bindTools:(tools:any[])=>({invoke:async(messages:any[])=>{
      expect(JSON.stringify(messages)).toContain('Choose scene boundaries for independent editing');expect(JSON.stringify(messages)).toContain('continuous animation or coordinated transition can stay within one scene component');
      const inspect=JSON.parse(await tools.find(t=>t.name==='inspect_project').invoke({}));
      return new AIMessage({content:'',tool_calls:turn++===0?[{id:'edit',name:'edit_scenes',args:{baseRevision:inspect.revision,operations:[{type:'updateScene',id:'one',patch:{props:{headline:'Agent'}}}]}}]:[{id:'done',name:'finish_design',args:{}}]});
@@ -97,7 +105,7 @@ describe('journaled revisions',()=>{
 
 describe('session library authorization and recovery',()=>{
  function publishingModel(onTools:(names:string[])=>void, publish:boolean){let turn=0;return {
-   withStructuredOutput:()=>({invoke:async()=>({concept:'Card',scenes:[{start:0,end:8,copy:'Card',visual:'Card',motion:'None',assetKeys:[]}],assets:[],nextChanges:['Save card']})}),
+   withStructuredOutput:()=>({invoke:async()=>({concept:'Card',scenes:[{id:null,componentId:null,start:0,end:8,copy:'Card',visual:'Card',motion:'None',assetKeys:[]}],assets:[],nextChanges:['Save card']})}),
    bindTools:(tools:any[])=>{onTools(tools.map(t=>t.name));return {invoke:async()=>{
      if(turn++>0)return new AIMessage({content:'',tool_calls:[{id:'done',name:'finish_design',args:{}}]});
      if(publish)return new AIMessage({content:'',tool_calls:[{id:'publish',name:'save_library_component',args:{localComponentId:'card',componentId:'brand-card',version:'1',name:'Brand card'}}]});

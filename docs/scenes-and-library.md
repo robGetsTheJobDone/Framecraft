@@ -17,6 +17,8 @@ Structured projects use project schema version 2; legacy projects retain version
 
 ## Create and edit scenes
 
+Fresh `createAdSession` projects start in scene mode with an empty composition. Existing saved projects keep their current mode. Integrations that deliberately need a new legacy source project can set `initialMode: 'source'`; this option never converts an existing project.
+
 ```ts
 import {createAdSession} from '@framecraft/studio';
 

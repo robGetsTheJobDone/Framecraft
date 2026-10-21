@@ -5,7 +5,7 @@ const id = z.string().regex(/^[a-zA-Z0-9_-]{1,60}$/);
 export const adProductionPlanSchema = z.object({
   concept: z.string().min(1).max(600),
   scenes: z.array(z.object({
-    id: id.optional(), componentId: id.optional(),
+    id: id.nullable().describe('Existing or planned scene ID; null when not assigned'), componentId: id.nullable().describe('Existing or planned component ID; null when not assigned'),
     start: z.number().min(0), end: z.number().positive(),
     copy: z.string().max(500), visual: z.string().min(1).max(600), motion: z.string().min(1).max(600),
     assetKeys: z.array(id).max(8),
@@ -16,6 +16,12 @@ export const adProductionPlanSchema = z.object({
   }).strict()).max(12),
   nextChanges: z.array(z.string().min(1).max(600)).min(1).max(8),
 }).strict();
+// Old saved plans predate scene identities. Normalize only persisted data; provider output stays strict.
+export const storedProductionPlanSchema = z.preprocess(value => {
+  if (!value || typeof value !== 'object' || !('scenes' in value) || !Array.isArray(value.scenes)) return value;
+  return {...value, scenes:value.scenes.map(scene => scene && typeof scene === 'object'
+    ? {id:null, componentId:null, ...scene} : scene)};
+}, adProductionPlanSchema);
 export type AdProductionPlan = z.infer<typeof adProductionPlanSchema>;
 export function validateProductionPlan(plan: AdProductionPlan, assets: Record<string,string>, duration: number, generated: Record<string,string>) {
   const keys=new Set(plan.assets.map(a=>a.key));

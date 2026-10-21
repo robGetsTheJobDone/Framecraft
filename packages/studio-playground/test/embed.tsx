@@ -8,7 +8,7 @@ import {renderAd} from '@deepbench/studio';
 import {encodeWav} from '@deepbench/studio-audio';
 import {AIMessage, AIMessageChunk} from '@langchain/core/messages';
 const source=`export default function Ad({width,height}) { const frame=useCurrentFrame(); return <div className="bg-blue-500" style={{width,height,position:'relative',color:'white',fontFamily:'Arial',overflow:'hidden'}}><h1 style={{fontSize:30,transform:'translateX('+frame+'px)'}}>Browser source</h1></div>; }`;
-const plan={concept:'Browser test',scenes:[{start:0,end:3,copy:'Browser source',visual:'Blue',motion:'Moving text',assetKeys:[]}],assets:[],nextChanges:['Write the source']};
+const plan={concept:'Browser test',scenes:[{id:null,componentId:null,start:0,end:3,copy:'Browser source',visual:'Blue',motion:'Moving text',assetKeys:[]}],assets:[],nextChanges:['Write the source']};
 const calls: Array<{name:string; input:any}> = [];
 (window as any).modelCalls = calls;
 let designRuns = 0;
@@ -35,7 +35,7 @@ const model:any={withStructuredOutput:(_schema:any,{name}:any)=>({invoke:async(m
     }else yield new AIMessageChunk({content:'',tool_call_chunks:[{id:'finish',name:'finish_design',args:'{}',index:0,type:'tool_call_chunk'}]});
   }
 }}};
-const session=await createAdSession({projectId:'embedded-test',adapters:{model,storage:new MemoryFileSystem()},formats:[{id:'story',width:320,height:180}],durationSeconds:3,fps:10,review:{maxRounds:2}});
+const session=await createAdSession({projectId:'embedded-test',initialMode:'source',adapters:{model,storage:new MemoryFileSystem()},formats:[{id:'story',width:320,height:180}],durationSeconds:3,fps:10,review:{maxRounds:2}});
 if(new URLSearchParams(location.search).has('teleprompter'))await session.requestVoiceover({title:'Read these lines',script:'Hello there.\nWelcome to our studio.',language:'en',startSeconds:0,durationSeconds:3});
 function FixtureStudio(){const [current,setCurrent]=React.useState(session);return <AdStudio key={current.projectId} session={current} onImportZip={async file=>{const restored=await current.importZip(file);(window as any).testSession=restored;setCurrent(restored);}}/>;}
 createRoot(document.getElementById('root')!).render(<FixtureStudio/>);

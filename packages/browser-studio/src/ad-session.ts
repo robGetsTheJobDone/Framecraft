@@ -17,7 +17,7 @@ import {renderAd, type AdFormat, type AdFrame, type AdRenderInput} from '@deepbe
 import {audioClipSettingsSchema, audioClipSettingsDescription, openStudioSession, type ImageGenerationProvider, type StudioSession} from './index.js';
 import {createSkillRegistry, type StudioSkill, type AgentRole} from './skills.js';
 import {adDesignSkills} from './ad-skills.js';
-import {adProductionPlanSchema, validateProductionPlan} from './production-plan.js';
+import {adProductionPlanSchema, storedProductionPlanSchema, validateProductionPlan} from './production-plan.js';
 import type {SpeechProvider} from '@deepbench/studio-dubbing';
 import {createConversationFileSystem, assertValidProject, type StudioProject, type StudioAsset} from '@deepbench/studio-project';
 
@@ -36,6 +36,8 @@ export interface StudioAdapters {
 }
 export interface AdSessionOptions {
   projectId: string;
+  /** Applies only to new projects. Existing saved projects keep their rendering mode. */
+  initialMode?:'scenes'|'source';
   libraryWorkspaceId?:string;
   initialBrief?: string;
   context?: ProductContextOptions;
@@ -68,9 +70,16 @@ export async function createAdSession(options: AdSessionOptions) {
   if (!formats.length || new Set(formats.map(f => f.id)).size !== formats.length || formats.some(f => !/^[A-Za-z0-9_-]+$/.test(f.id) || !Number.isSafeInteger(f.width) || !Number.isSafeInteger(f.height) || f.width <= 0 || f.height <= 0)) throw new Error('Provide unique formats with positive integer dimensions');
   const policy = {maxRounds: 6, minScore: 8.5, requireNoMajorIssues: true, stopAfterStalledRounds: 2, keepBestVersion: true, ...options.review};
   if (!Number.isInteger(policy.maxRounds) || policy.maxRounds < 1 || policy.maxRounds > 20 || !Number.isFinite(policy.minScore) || policy.minScore < 0 || policy.minScore > 10 || !Number.isInteger(policy.stopAfterStalledRounds) || policy.stopAfterStalledRounds < 1) throw new Error('Invalid review policy');
+  if(options.initialMode!==undefined&&!['scenes','source'].includes(options.initialMode))throw new Error('initialMode must be scenes or source');
   const storage = options.adapters.storage ?? new IndexedDBFileSystem({databaseName: 'deepbench-studio'});
-  await recoverSceneTransaction(createConversationFileSystem(storage,options.projectId),options.projectId);
-  const base = await openStudioSession({filesystem: storage, conversationId: options.projectId, imageProvider: options.adapters.imageGeneration, seed: {title: options.brand?.name ?? 'Untitled film', width: formats[0].width, height: formats[0].height, durationSeconds: options.durationSeconds ?? 8, fps: options.fps ?? 30}});
+  const workspace=createConversationFileSystem(storage,options.projectId);
+  await recoverSceneTransaction(workspace,options.projectId);
+  const base = await withProjectRevisionLock(options.projectId,async()=>{
+    let exists=false;try{await workspace.stat('/project.json');exists=true;}catch(error){if(!missing(error))throw error;}
+    const session=await openStudioSession({filesystem: storage, conversationId: options.projectId, imageProvider: options.adapters.imageGeneration, seed: {title: options.brand?.name ?? 'Untitled film', width: formats[0].width, height: formats[0].height, durationSeconds: options.durationSeconds ?? 8, fps: options.fps ?? 30}});
+    if(!exists&&options.initialMode!=='source'){const project=await session.store.load();project.schemaVersion=2;project.composition={version:1,components:[],scenes:[]};await session.store.save(project);}
+    return session;
+  });
   const fs = await mountContextFiles(base.filesystem,options.context);
   base.filesystem=fs; base.store={...base.store,filesystem:fs};
   const contextManifest=await contextFileManifest(fs);
@@ -270,7 +279,7 @@ export async function createAdSession(options: AdSessionOptions) {
       for (let round = cursor.round; round <= runPolicy.maxRounds && cursor.phase !== 'committing'; round++) {
         signal.throwIfAborted(); emit({type:'planning',runId,round});
         const currentInput = (await inputs(candidate))[0];
-        const previousPlan = adProductionPlanSchema.safeParse(JSON.parse(await read(candidate.filesystem,'/plan.json')));
+        const previousPlan = storedProductionPlanSchema.safeParse(JSON.parse(await read(candidate.filesystem,'/plan.json')));
         let editPlan: z.infer<typeof editPlanSchema> | undefined;
         const continuing = cursor.phase !== 'planning';
         if (!continuing && previousPlan.success && conversation.filter(message=>message.role==='user').length > 1) {
@@ -280,7 +289,7 @@ export async function createAdSession(options: AdSessionOptions) {
           ],{signal}));
           await fs.writeFile(`${folder}/${round}/edit-plan.json`,JSON.stringify(editPlan),{createParents:true});
         }
-        const plan = continuing ? adProductionPlanSchema.parse(JSON.parse(await read(candidate.filesystem,'/plan.json'))) : previousPlan.success && editPlan && !editPlan.needsProductionPlan
+        const plan = continuing ? storedProductionPlanSchema.parse(JSON.parse(await read(candidate.filesystem,'/plan.json'))) : previousPlan.success && editPlan && !editPlan.needsProductionPlan
           ? {...previousPlan.data, nextChanges:editPlan.changes, assets:previousPlan.data.assets.map(asset => generatedKeys[asset.key] && Object.hasOwn(currentInput.assets,generatedKeys[asset.key]) ? {...asset,action:'reuse' as const,assetId:generatedKeys[asset.key]} : asset)}
           : adProductionPlanSchema.parse(await model('planner').withStructuredOutput(adProductionPlanSchema, {name:'production_plan'}).invoke([new SystemMessage(instructions('planner')+'\nReturn a concise production plan, never private reasoning. Preserve the current design except for requested changes.'), new HumanMessage(JSON.stringify({brief, conversation, currentSource:currentInput.source, currentPlan:previousPlan.success?previousPlan.data:undefined, assets:Object.keys(currentInput.assets), duration:currentInput.durationSeconds, feedback}))], {signal}));
         emit({type:'planning',runId,round,message:editPlan ? 'Edit plan: '+editPlan.changes.join('; ') : plan.concept+'\n'+plan.scenes.map(scene=>`${scene.start}–${scene.end}s: ${scene.copy}`).join('\n')});
