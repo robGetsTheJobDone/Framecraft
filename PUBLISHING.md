@@ -27,3 +27,5 @@ The workflow uses Node 24 and OIDC; no stored npm token is needed. See [npm trus
 Publishing a release runs build, tests, portable bundle validation and a browser smoke test before publishing with public access and provenance. A mismatched tag fails. Never reuse an already published version. Pre-release version strings are rejected to avoid accidentally promoting them to npm's `latest` tag.
 
 Run **Publish studio to npm → Run workflow** for validation only; manual runs do not publish. Locally, use `pnpm pack:studio` followed by `node scripts/check-portable.mjs`. Generated declarations are included in the npm artifact for consumers, but remain excluded from Git.
+
+Release validation uses a GitHub-hosted macOS runner because the full audio/video smoke test requires AAC encoding, which is unavailable in standard Linux Chromium. WebM remains available for browsers without AAC.
