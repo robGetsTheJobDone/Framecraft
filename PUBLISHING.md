@@ -1,4 +1,4 @@
-# Publishing @deepbench/studio
+# Publishing @framecraft/studio
 
 The public Git repository lives in `studio/` in the local parent workspace. GitHub still sees the package workspace at its repository root. The sibling `hosting/` folder is not part of this repo.
 
@@ -6,7 +6,7 @@ The npm artifact bundles the internal workspace packages into one installable pa
 
 ## One-time npm setup
 
-Use an npm account with permission to publish in the `@deepbench` scope. If the package does not exist yet, log into npm locally, run `pnpm pack:studio`, then run `npm publish --access public` from `packages/studio/portable` to create the first version.
+Use an npm account with permission to publish in the `@framecraft` scope. If the package does not exist yet, log into npm locally, run `pnpm pack:studio`, then run `npm publish --access public` from `packages/studio/portable` to create the first version.
 
 In the npm package settings, configure a GitHub Actions trusted publisher:
 

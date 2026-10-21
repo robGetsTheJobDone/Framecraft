@@ -6,11 +6,11 @@ React 19 UI plus a browser-local workspace, TSX compiler, isolated Remotion prev
 
 Run `pnpm dev`, then open http://localhost:5180/?mode=ad for the source studio. The default URL opens the source studio; `?mode=timeline` opens the legacy timeline playground. Only the playground gateway reads the root `.env`; the package has no server dependency.
 
-Run `pnpm pack:studio` to build `deepbench-studio-0.1.0.tgz`. In another project, run `pnpm add /absolute/path/to/deepbench-studio-0.1.0.tgz`. The artifact contains bundled workspace JavaScript, local declarations, CSS, and esbuild WASM, with no workspace-protocol dependencies. React and React DOM are host peers. Mount client-side using a browser bundler such as Vite; SSR is not supported.
+Run `pnpm pack:studio` to build `framecraft-studio-0.1.0.tgz`. In another project, run `pnpm add /absolute/path/to/framecraft-studio-0.1.0.tgz`. The artifact contains bundled workspace JavaScript, local declarations, CSS, and esbuild WASM, with no workspace-protocol dependencies. React and React DOM are host peers. Mount client-side using a browser bundler such as Vite; SSR is not supported.
 
 ```tsx
-import {Studio} from '@deepbench/studio';
-import '@deepbench/studio/styles.css';
+import {Studio} from '@framecraft/studio';
+import '@framecraft/studio/styles.css';
 
 <Studio
   projectId="campaign-123"
@@ -22,12 +22,12 @@ import '@deepbench/studio/styles.css';
 />
 ```
 
-The model must support tool calling, structured output, vision, and cancellation. Hosts supply provider transport through adapters; the package does not read environment variables or embed a shared API key. Keep adapter instances stable across renders. `projectId` isolates conversations in IndexedDB; `adapters.storage` replaces persistence. If the bundler does not copy WASM automatically, import `@deepbench/studio/esbuild.wasm?url` (Vite) and pass it as `wasmURL`.
+The model must support tool calling, structured output, vision, and cancellation. Hosts supply provider transport through adapters; the package does not read environment variables or embed a shared API key. Keep adapter instances stable across renders. `projectId` isolates conversations in IndexedDB; `adapters.storage` replaces persistence. If the bundler does not copy WASM automatically, import `@framecraft/studio/esbuild.wasm?url` (Vite) and pass it as `wasmURL`.
 
 ## Session, roles, and skills
 
 ```ts
-import {createAdSession, adDesignSkills} from '@deepbench/studio';
+import {createAdSession, adDesignSkills} from '@framecraft/studio';
 
 const session = await createAdSession({
   projectId: 'campaign-123',
@@ -97,7 +97,7 @@ Agents use `set_audio_clip` with `clipId`, nullable `volumeDb`, `fadeInSeconds`,
 An optional `adapters.checkpoints` adapter stores a portable session snapshot. The snapshot contains conversation, workspace/assets, skills, history and interrupted-run state. Credentials and model instances are supplied by the host each time; they are not serialized.
 
 ```ts
-import {createAdSession, restoreAdSession, type CheckpointAdapter} from '@deepbench/studio';
+import {createAdSession, restoreAdSession, type CheckpointAdapter} from '@framecraft/studio';
 
 const checkpoints: CheckpointAdapter = {
   async read(projectId) {
@@ -132,7 +132,7 @@ The optional Node entry point reads local files without pulling Node APIs into t
 
 ```ts
 // Node/build script: deliver this serializable map to your browser app.
-import {loadContextFiles} from '@deepbench/studio/node';
+import {loadContextFiles} from '@framecraft/studio/node';
 const productFiles = await loadContextFiles({
   root:'./src',
   include:['**/*.{tsx,ts,css}', '**/README.md'],
@@ -189,3 +189,5 @@ const restored = await restoreAdSession({
 });
 ```
 This adapter stages snapshots in memory; they become portable/durable when downloaded. It does not automatically download at every checkpoint and does not upload anything to a server. Keep the normal IndexedDB workspace for browser-local durability. Supply model/credentials again when restoring. A host using controlled conversation lists can use `Studio.onImported(session)` to add and select the new conversation; `AdStudio` hosts supply `onImportZip(file)` to replace their session instance.
+
+The published npm package is `@framecraft/studio`. The private source workspace retains its internal `@deepbench/studio` name.

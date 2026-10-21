@@ -3,7 +3,7 @@ import {readFile, access} from 'node:fs/promises';
 const root = new URL('../packages/studio/portable/', import.meta.url);
 const source = JSON.parse(await readFile(new URL('../packages/studio/package.json', import.meta.url), 'utf8'));
 const pkg = JSON.parse(await readFile(new URL('package.json', root), 'utf8'));
-assert.equal(pkg.name, '@deepbench/studio');
+assert.equal(pkg.name, '@framecraft/studio');
 assert.equal(pkg.version, source.version);
 assert.equal(pkg.private, undefined);
 assert.equal(pkg.publishConfig.access, 'public');

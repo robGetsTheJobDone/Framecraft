@@ -69,4 +69,4 @@ See [the studio package](packages/studio/README.md) for the React component, hea
 
 ## Publishing
 
-See [PUBLISHING.md](PUBLISHING.md) for the npm release workflow and one-time trusted publisher setup. The installable artifact is `@deepbench/studio`; internal packages remain private.
+See [PUBLISHING.md](PUBLISHING.md) for the npm release workflow and one-time trusted publisher setup. The installable artifact is `@framecraft/studio`; internal packages remain private.
