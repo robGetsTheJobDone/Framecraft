@@ -9,3 +9,5 @@ coverage/
 packages/browser-ad-renderer/src/harness-code.ts
 packages/studio/portable/
 *.tgz
+
+packages/browser-ad-renderer/src/runtime-versions.ts

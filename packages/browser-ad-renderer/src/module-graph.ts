@@ -1,11 +1,13 @@
+import {validatePackageGraph, packageBuiltins, type PackageLock} from './packages.js';
 import type {BuildOptions} from 'esbuild-wasm';
 import {isModulePath, type SceneComposition} from '@deepbench/studio-project';
 export const moduleLimits = {files: 256, fileCharacters: 120000, totalCharacters: 2000000};
 /** Includes all sources, so changes to any transitive helper invalidate the cache. */
-export function sceneCompilationKey(modules: Record<string, string>, composition: SceneComposition): string {
-  return JSON.stringify([Object.entries(modules).sort(([a],[b]) => a.localeCompare(b)), composition.components.map(c => [c.id,c.entry])]);
+export function sceneCompilationKey(modules: Record<string, string>, composition: SceneComposition, packages?:PackageLock): string {
+  return JSON.stringify([Object.entries(modules).sort(([a],[b]) => a.localeCompare(b)), composition.components.map(c => [c.id,c.entry]), packages]);
 }
-export function createSceneBuildOptions(modules: Record<string, string>, composition: SceneComposition): BuildOptions {
+export function createSceneBuildOptions(modules: Record<string, string>, composition: SceneComposition, packages?:PackageLock): BuildOptions {
+  if(packages)validatePackageGraph(packages);
   const entries = Object.entries(modules); let total = 0;
   if (entries.length > moduleLimits.files) throw new Error('Too many source modules');
   for (const [path, source] of entries) {
@@ -32,9 +34,18 @@ export function createSceneBuildOptions(modules: Record<string, string>, composi
   return {stdin: {contents: entry, sourcefile: '__scene_entry.ts', loader: 'ts', resolveDir: '/'}, bundle: true, write: false, format: 'cjs', platform: 'browser', target: 'es2022', jsx: 'transform', logLevel: 'silent', plugins: [{name: 'project-modules', setup(build) {
     build.onResolve({filter: /.*/}, args => {
       if (args.kind === 'dynamic-import') return {errors: [{text: 'Dynamic imports are unsupported in scene modules'}]};
-      if (args.path === 'react' || args.path === 'remotion') return {path: args.path, external: true};
+      if (packageBuiltins.includes(args.path as any)) return {path: args.path, external: true};
+      if(args.namespace==='package') {
+        const imports=packages?.modules[args.importer]?.imports;
+        const target=imports&&Object.hasOwn(imports,args.path)?imports[args.path]:undefined;
+        if(!target)return {errors:[{text:`Unresolved package dependency: ${args.path}`}]};
+        return packageBuiltins.includes(target as any)?{path:target,external:true}:{path:target,namespace:'package'};
+      }
+      const installed=packages?.packages.find(pkg=>pkg.imports.includes(args.path));
+      if(installed)return {path:installed.entry,namespace:'package'};
       try {return {path: resolve(args.path, args.importer || '/__scene_entry.ts'), namespace: 'project'};} catch (error) {return {errors: [{text: String(error)}]};}
     });
+    build.onLoad({filter: /.*/, namespace: 'package'}, args => ({contents: packages!.modules[args.path].source, loader:'js'}));
     build.onLoad({filter: /.*/, namespace: 'project'}, args => ({contents: modules[args.path], loader: args.path.endsWith('tsx') ? 'tsx' : args.path.endsWith('jsx') ? 'jsx' : args.path.endsWith('ts') ? 'ts' : 'js'}));
   }}]};
 }

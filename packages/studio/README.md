@@ -217,3 +217,58 @@ Run `pnpm pack:studio` to build a standalone npm tarball. The public npm name is
 ## Scene components and brand library
 
 Build structured scenes from reusable TSX components, edit their timing/settings without rewriting code, and save pinned component versions through a library adapter. See [the scene and library guide](https://github.com/robGetsTheJobDone/Framecraft/blob/feat/scene-components-brand-library/docs/scenes-and-library.md) for contracts, migration, agent tools, and storage integration.
+
+### Agent-installed browser packages
+
+The designer has `list_packages`, `inspect_package` and `install_package` tools.
+Installation downloads ESM from esm.sh, pins the complete resolved module graph,
+checks compatibility, and imports it inside the render sandbox before committing.
+No package lifecycle scripts run. The host page never imports downloaded code.
+
+```ts
+const info = await session.packages.inspect('d3-interpolate');
+await session.packages.install(info.name, info.version);
+console.log(await session.packages.list());
+// Scene source can now use: import {interpolateRgb} from 'd3-interpolate';
+```
+
+`list_packages` reports built-in runtime versions and direct installed packages.
+`inspect_package({name, version: null})` resolves the current version; installation
+requires an exact version. A failed install leaves the project unchanged. Repeating
+an installed version is safe; implicit version upgrades are rejected. Package changes
+participate in undo/redo, checkpoints, run recovery, project bundles and ZIPs.
+`/packages.lock.json` stores module source, exact resolved URLs, import mappings and
+SHA-256 checksums. Rendering verifies integrity and bundles saved bytes, with no CDN
+fetches during preview/export. React, its JSX runtimes and Remotion stay shared with
+the renderer. Both structured scenes and legacy Ad.tsx support installed packages.
+
+Hosts can configure policy through `createAdSession({packages: {...}, ...})`:
+
+- `enabled: false` disables inspection and installation.
+- `allowedPackages: ['d3-interpolate', 'd3-color']` restricts every downloaded package,
+  including transitive dependencies. Omit for general browser-package installation.
+- `fetch` supplies an optional transport. Default requests omit credentials and
+  referrers and reject redirects. Only npm registry metadata and esm.sh code are fetched.
+- Custom render adapters must explicitly set `renderSupportsPackages: true` and consume
+  `AdRenderInput.packages`; otherwise installation fails rather than silently ignoring code.
+
+Initial scope: root entry imports, JavaScript ESM, up to 32 direct packages, 128 modules,
+512 KiB per response and 4 MiB total source. Downloads have per-request timeouts,
+a request budget and an overall download deadline. Node APIs, dynamic imports,
+import.meta, runtime asset loading, CSS/WASM imports and replacement React runtimes
+are unsupported. Components published to the brand library still require its existing
+self-contained React/Remotion contract; package-backed library releases are not supported.
+
+These are compatibility checks and containment measures, **not a malware audit or a
+safety certification**. The iframe keeps its opaque origin and existing restrictive CSP.
+Checksums detect changed saved bytes; they do not prove the publisher is trustworthy.
+An import smoke test does not prove arbitrary animation behavior: drive animation from
+Remotion frames and validate actual renders. Resource limits do not guarantee protection
+from all CPU/memory exhaustion or browser vulnerabilities. Hosts requiring publisher
+approval should use `allowedPackages`.
+
+Validation: `pnpm build`, `node packages/studio/build/portable.mjs`, then
+`node scripts/packages-browser-smoke.mjs`. Open the printed URL for a production-bundle
+check using a real CDN package, frame seeking, ZIP restore with the package transport
+disabled, WebM export, and a fixture package using the shared React JSX runtime/hooks.
+This smoke check makes no model calls.

@@ -78,3 +78,5 @@ export {createMemoryComponentLibrary, createFileSystemComponentLibrary, prepareC
 export type {SceneComposition, SceneComponent, SceneInstance, ComponentInput, JsonValue} from '@deepbench/studio-project';
 
 export type {FeedbackAttachment} from '@deepbench/browser-studio';
+
+export type {PackagePolicy, PackageLock, InstalledPackage, PackageModule} from '@deepbench/browser-studio';

@@ -64,7 +64,8 @@ async function imports(source: string, path: string, requireDefault=false): Prom
   };
   visit(ast.program);return found;
 }
-function resolveImport(from: string, specifier: string, modules: Record<string,string>) {
+function resolveImport(from: string, specifier: string, modules: Record<string,string>, externals:ReadonlySet<string>) {
+  if (externals.has(specifier)) return null;
   if (['react','remotion'].includes(specifier)) return null;
   if (!specifier.startsWith('.') || specifier.includes('\\') || specifier.includes('\0')) fail(`Unsupported library import: ${specifier}`);
   const base = normalizePath(from.slice(0,from.lastIndexOf('/')+1)+specifier);
@@ -74,7 +75,7 @@ function resolveImport(from: string, specifier: string, modules: Record<string,s
   if (!target) fail(`Missing library import ${specifier} from ${from}`);
   return target!;
 }
-export async function extractComponentModules(entry: string, modules: Record<string,string>): Promise<Record<string,string>> {
+export async function extractComponentModules(entry: string, modules: Record<string,string>, externals:ReadonlySet<string>=new Set()): Promise<Record<string,string>> {
   safePath(entry);
   if (!record(modules)) fail('Expected component modules');
   const result: Record<string,string> = Object.create(null); let total=0;
@@ -84,7 +85,7 @@ export async function extractComponentModules(entry: string, modules: Record<str
     const size = enc.encode(source).byteLength; total += size;
     if (size > componentLibraryLimits.moduleBytes || total > componentLibraryLimits.sourceBytes || Object.keys(result).length >= componentLibraryLimits.modules) fail('Component module resource limit exceeded');
     result[path]=source;
-    for (const specifier of await imports(source,path,path===entry)) {const resolved=resolveImport(path,specifier,modules); if(resolved)await visit(resolved);}
+    for (const specifier of await imports(source,path,path===entry)) {const resolved=resolveImport(path,specifier,modules,externals); if(resolved)await visit(resolved);}
   };
   await visit(entry); return result;
 }

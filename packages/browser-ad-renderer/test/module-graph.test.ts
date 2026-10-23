@@ -27,3 +27,20 @@ describe('virtual scene module graph',()=>{
     expect(()=>createSceneBuildOptions({...modules,'/large.ts':'x'.repeat(120001)},composition)).toThrow();
   });
 });
+
+
+describe('locked package resolver',()=>{
+ const url='https://esm.sh/demo@1.0.0/es2022/demo.mjs';
+ const lock={version:1 as const,packages:[{name:'demo',version:'1.0.0',entry:url,imports:['demo']}],modules:{[url]:{source:"export const color='green'",sha256:'a'.repeat(64),imports:{}}}};
+ it('bundles saved package code without a network resolver and invalidates changed locks',async()=>{
+  const scene={'/scenes/Hello.tsx':"import {color} from 'demo'; export default ()=>color"};
+  const output=await build(createSceneBuildOptions(scene,composition,lock));expect(output.outputFiles![0].text).toContain('green');
+  expect(sceneCompilationKey(scene,composition,lock)).not.toBe(sceneCompilationKey(scene,composition));
+ });
+ it('rejects unlocked dependencies and dynamic imports even in saved package code',async()=>{
+  for(const source of ["import 'other'; export const color='x';","export const color=import('react');"]){
+   const next=structuredClone(lock);next.modules[url].source=source;
+   await expect(build(createSceneBuildOptions({'/scenes/Hello.tsx':"import {color} from 'demo';export default ()=>color"},composition,next))).rejects.toThrow();
+  }
+ });
+});

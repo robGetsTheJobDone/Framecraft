@@ -16,5 +16,11 @@ export async function renderAd(...args: Parameters<typeof Runtime.renderAd>) {
 export async function compileSceneModules(...args: Parameters<typeof Runtime.compileSceneModules>) {
   args[0] = {...args[0]};
   args[1] = structuredClone(args[1]);
+  if(args[3])args[3]=structuredClone(args[3]);
   return (await import('./renderer-runtime.js')).compileSceneModules(...args);
 }
+
+export {verifyPackageIntegrity, validatePackageGraph, packageBuiltins, packageLimits} from './packages.js';
+export type {PackageLock, PackageModule, InstalledPackage} from './packages.js';
+
+export {packageRuntimeVersions} from './runtime-versions.js';

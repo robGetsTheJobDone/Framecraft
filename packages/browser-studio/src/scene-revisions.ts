@@ -9,7 +9,7 @@ async function withProjectLock<T>(key:string,action:()=>Promise<T>):Promise<T>{
   const locks=globalThis.navigator?.locks;if(locks)return locks.request(`framecraft-project-${key}`,{mode:'exclusive'},action);
   const previous=localLocks.get(key)??Promise.resolve();const next=previous.catch(()=>{}).then(action);localLocks.set(key,next);try{return await next;}finally{if(localLocks.get(key)===next)localLocks.delete(key);}
 }
-export const isRevisionFile=(path:string)=>path==='/project.json'||path==='/Ad.tsx'||path==='/plan.json'||path==='/component-library-lock.json'||isProjectModule(path)||path.startsWith('/assets/')||path.startsWith('/music/');
+export const isRevisionFile=(path:string)=>path==='/packages.lock.json'||path==='/project.json'||path==='/Ad.tsx'||path==='/plan.json'||path==='/component-library-lock.json'||isProjectModule(path)||path.startsWith('/assets/')||path.startsWith('/music/');
 export async function revisionFiles(fs:BrowserFileSystem) {return captureFiles(fs,isRevisionFile);}
 export function withProjectRevisionLock<T>(lockKey:string,action:()=>Promise<T>){return withProjectLock(lockKey,action);}
 export function readRevisionSnapshot(fs:BrowserFileSystem,lockKey='default'){return withProjectLock(lockKey,()=>revisionFiles(fs));}

@@ -275,3 +275,6 @@ export * from './component-library.js';
 
 export {validateFeedback,feedbackLimits} from './feedback.js';
 export type {FeedbackAttachment} from './feedback.js';
+
+export type {PackagePolicy} from './packages.js';
+export type {PackageLock, InstalledPackage, PackageModule} from '@deepbench/browser-ad-renderer';

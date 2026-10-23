@@ -1,4 +1,6 @@
 import React from 'react';
+import * as JSXRuntime from 'react/jsx-runtime';
+import * as JSXDevRuntime from 'react/jsx-dev-runtime';
 import {createRoot} from 'react-dom/client';
 import {flushSync} from 'react-dom';
 import {Player, Thumbnail} from '@remotion/player';
@@ -39,7 +41,7 @@ window.addEventListener('message', async event => {
       window.cancelAnimationFrame = id => {callbacks.delete(id);};
     }
     const module = {exports: {} as {default?: React.ComponentType<any> | Record<string, React.ComponentType<any>>}};
-    const require = (id: string) => {if (id === 'react') return React; if (id === 'remotion') return Remotion; throw new Error(`Unsupported import: ${id}`);};
+    const require = (id: string) => {if (id === 'react') return React; if(id==='react/jsx-runtime')return JSXRuntime; if(id==='react/jsx-dev-runtime')return JSXDevRuntime; if (id === 'remotion') return Remotion; throw new Error(`Unsupported import: ${id}`);};
     const names = ['useCurrentFrame','useVideoConfig','interpolate','interpolateColors','spring','Easing','Sequence','Series','AbsoluteFill','Img','Freeze','Loop','random'];
     new Function('module', 'exports', 'require', 'React', ...names, config.code)(module, module.exports, require, React, ...names.map(name => (Remotion as any)[name]));
     const exported = module.exports.default;
@@ -82,6 +84,7 @@ window.addEventListener('message', async event => {
     }
     const results = [];
     for (const frame of config.reviewFrames ?? [.1, .35, .6, .85].map(fraction => Math.floor((frames - 1) * fraction))) {
+      send({stage: `capturing frame ${frame}`});
       results.push({format: props.format, timeSeconds: frame / config.fps, dataUrl: await capture(frame)});
     }
     send({frames: results});

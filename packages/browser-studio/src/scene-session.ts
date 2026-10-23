@@ -23,7 +23,7 @@ export async function readProjectModules(fs:BrowserFileSystem) {
   for(const file of await fs.list('/',{recursive:true})) if(file.type==='file'&&isProjectModule(file.path)) modules[file.path]=new TextDecoder().decode(await fs.readFile(file.path));
   return modules;
 }
-export async function applySceneOperations(original:StudioProject, originalModules:Record<string,string>, operations:SceneOperation[]) {
+export async function applySceneOperations(original:StudioProject, originalModules:Record<string,string>, operations:SceneOperation[], externalImports:ReadonlySet<string>=new Set()) {
   const project=structuredClone(original);const modules={...originalModules};
   project.schemaVersion=2;
   project.composition ??= {version:1,components:[],scenes:[]};
@@ -50,7 +50,7 @@ export async function applySceneOperations(original:StudioProject, originalModul
         const target=scene(operation.id);const old=component(target.componentId);
         if(composition.components.some(c=>c.id===operation.componentId))throw new Error('Fork component ID already exists');
         validateModulePath(operation.entry);if(Object.hasOwn(modules,operation.entry))throw new Error('Fork module path already exists');
-        const closure=await extractComponentModules(old.entry,modules);const prefix=`/components/forks/${operation.componentId}`;
+        const closure=await extractComponentModules(old.entry,modules,externalImports);const prefix=`/components/forks/${operation.componentId}`;
         for(const [path,source]of Object.entries(closure)){const next=prefix+path;if(Object.hasOwn(modules,next))throw new Error('Fork dependency path already exists');modules[next]=source;}
         const from=operation.entry.split('/').slice(1,-1);const to=(prefix+old.entry).split('/').slice(1);while(from.length&&to.length&&from[0]===to[0]){from.shift();to.shift();}
         const relative=(from.length?'../'.repeat(from.length):'./')+to.join('/');
