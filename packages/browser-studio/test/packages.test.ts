@@ -29,11 +29,11 @@ describe('project packages',()=>{
  });
  it('pins transitive semver wrappers to exact CDN paths and checks resolved identity',async()=>{
   const base=transport({[code]:"import {value} from '/helper@^2.0.0?target=es2022';export const color=value;"});
-  const fetch=vi.fn(async(url:any,options:any)=>String(url).includes('helper@^')?new Response('unexecuted wrapper',{headers:{'X-ESM-Path':'/helper@2.0.0/es2022/helper.mjs'}}):base(url,options)) as any;
+  const fetch=vi.fn(async(url:any,options:any)=>decodeURIComponent(String(url)).includes('helper@^')?new Response('unexecuted wrapper',{headers:{'X-ESM-Path':'/helper@2.0.0/es2022/helper.mjs'}}):base(url,options)) as any;
   const lock=await preparePackageInstall(emptyPackageLock(),'demo','1.0.0',{fetch});
   expect(lock.modules[code].imports['/helper@^2.0.0?target=es2022']).toBe(dep);
   expect(Object.keys(lock.modules).every(url=>!url.includes('^'))).toBe(true);
-  const mismatch=(async(url:any,options:any)=>String(url).includes('helper@^')?new Response('',{headers:{'X-ESM-Path':'https://evil.example/module.js'}}):base(url,options)) as any;
+  const mismatch=(async(url:any,options:any)=>decodeURIComponent(String(url)).includes('helper@^')?new Response('',{headers:{'X-ESM-Path':'https://evil.example/module.js'}}):base(url,options)) as any;
   await expect(preparePackageInstall(emptyPackageLock(),'demo','1.0.0',{fetch:mismatch})).rejects.toThrow('URL');
  });
  it('rejects remote domains, unpinned and Node dependencies and applies transitive policy',async()=>{
