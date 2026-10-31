@@ -2,7 +2,7 @@ import {useEffect, useRef, useState} from 'react';
 import type {editor} from 'monaco-editor';
 import './monaco.css';
 
-type Props = {path: string; value: string; readOnly: boolean; onChange(value: string): void; onSave(value: string): void};
+type Props = {path: string; value: string; readOnly: boolean; onChange(value: string): void; onSave(value: string): void; theme?: 'light' | 'dark'};
 const languageFor = (path: string) => {
   const extension = path.split('.').at(-1)?.toLowerCase();
   return ({ts: 'typescript', tsx: 'typescript', js: 'javascript', jsx: 'javascript', md: 'markdown', json: 'json', css: 'css', html: 'html', yaml: 'yaml', yml: 'yaml'} as Record<string, string>)[extension ?? ''] ?? 'plaintext';
@@ -21,7 +21,7 @@ export function MonacoFileEditor(props: Props) {
       if (disposed || !container.current) return;
       const model = monaco.editor.createModel(latest.current.value, languageFor(props.path));
       const editor = monaco.editor.create(container.current, {
-        model, theme: 'vs-dark', automaticLayout: true, readOnly: latest.current.readOnly,
+        model, theme: latest.current.theme === 'light' ? 'vs' : 'vs-dark', automaticLayout: true, readOnly: latest.current.readOnly,
         ariaLabel: 'File contents', accessibilitySupport: 'on',
         minimap: {enabled: false}, fontSize: 13, lineHeight: 20, tabSize: 2,
         scrollBeyondLastLine: false, wordWrap: 'on', padding: {top: 12, bottom: 12},
@@ -43,6 +43,7 @@ export function MonacoFileEditor(props: Props) {
       editor.restoreViewState(view);
     }
   }, [props.value]);
+  useEffect(() => {instance.current?.updateOptions({theme: props.theme === 'light' ? 'vs' : 'vs-dark'});}, [props.theme]);
   useEffect(() => {instance.current?.updateOptions({readOnly: props.readOnly});}, [props.readOnly]);
   return <div className="studio-code-editor">
     {status && <p role="status">{status}</p>}
