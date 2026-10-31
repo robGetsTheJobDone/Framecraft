@@ -1,76 +1,25 @@
-# Framecraft
+# Framecraft loading-state preview
 
-[![npm version](https://img.shields.io/npm/v/@framecraft/studio)](https://www.npmjs.com/package/@framecraft/studio)
+A dependency-free static preview built with system fonts and local CSS. The checkout had no tracked application files when rechecked. **No application lifecycle exists to integrate yet.** This preview stays in its loading state; it has no JavaScript, timers, invented progress or simulated completion. A future application must connect the loading view to its real loading, success and error transitions.
 
-An embeddable AI video studio for React, published as `@framecraft/studio`. This repository contains the studio, browser runtime, and development playground in a pnpm workspace. Create editable React and Remotion ads, generate image assets, compose music, record voiceover, and export video locally.
+## Serve locally
 
-**Embed in your app:** See the [package README](packages/studio/README.md) for installation and examples, or the [integration guide](docs/integration.md) for adapters, skills, and recovery.
-
-**Run the studio:** `pnpm install`, then `pnpm dev`. Open **http://127.0.0.1:5180**. For real AI, copy `.env.example` to `.env`, set `OPENAI_API_KEY`, and restart. Without a key it starts in demo mode. The agent can generate scene images for Remotion and request voiceover scripts for timeline review. See [playground instructions](packages/studio-playground/README.md).
-
-| Package | Purpose |
-| --- | --- |
-| [`@deepbench/studio`](packages/studio/README.md) | Embeddable React studio, headless sessions, skills, and integration adapters. |
-| [`@deepbench/browser-ad-renderer`](packages/browser-ad-renderer) | Browser compilation, sandboxed previews, rendered frames, and ad export. |
-| [`@deepbench/browser-filesystem`](packages/browser-filesystem/README.md) | Shared async filesystem with memory and persistent IndexedDB adapters. |
-| [`@deepbench/browser-deepagents`](packages/browser-deepagents/README.md) | LangChain Deep Agents environment backed by that filesystem. |
-| [`@deepbench/browser-remotion`](packages/browser-remotion/README.md) | React video preview and local MP4/WebM export. |
-| [`@deepbench/studio-project`](packages/studio-project/README.md) | Versioned timeline contracts, conversation isolation, seeding, validation, revisions. |
-| [`@deepbench/studio-audio`](packages/studio-audio/README.md) | Browser decoding, trim/gain/fades, timeline mixing, and WAV export. |
-| [`@deepbench/studio-dubbing`](packages/studio-dubbing/README.md) | AI script/speech interfaces, approval-gated workflow, and optional React wizard panel. |
-| [`@deepbench/browser-music`](packages/browser-music/README.md) | Separate composer agent, procedural instruments, editable scores, MIDI and synthesized audio. |
-| [`@deepbench/browser-studio`](packages/browser-studio/README.md) | Integrated conversation sessions, studio agent tools, imports, mixed previews, and video exports. |
-| [`@deepbench/studio-playground`](packages/studio-playground/README.md) | Runnable React studio with media uploads, preview, timeline controls, assistant chat, and dubbing. |
-
-## Development
-
-Use Node.js 22.22+ and pnpm 10.15.0.
+From this checkout, run:
 
 ```sh
-pnpm install
-pnpm build
-pnpm lint
-pnpm test
-pnpm exec playwright install chromium
-pnpm test:browser
+python3 -m http.server 8000 --bind 127.0.0.1 --directory /workspace
 ```
 
-`lint` currently performs TypeScript checking. Library packages export their compiled `dist` directories; build before consuming them. `pnpm dev` builds the playground's dependencies automatically and starts its local Vite server.
+Open http://127.0.0.1:8000 in a browser. No package installation, build step, external fonts or external assets are required. You can also open `index.html` directly.
 
-The browser suite verifies the actual Deep Agents tool loop, IndexedDB persistence, sample-accurate audio mixing, and the dubbing panel from draft through approval and speech application to an exported video with audible mixed audio. Deterministic model/speech providers keep tests credential-free. See [`tests/browser/fixture.tsx`](tests/browser/fixture.tsx) and [`tests/browser/studio-fixture.tsx`](tests/browser/studio-fixture.tsx).
+## Accessibility and layout
 
-For the integrated studio flow, start with [`createAdSession()` and `Studio`](packages/studio/README.md). Each conversation has its own files, editable composition, agent context, and review history. Sessions support checkpoint adapters, interrupted-run recovery, and ZIP download/import. Product source files can be supplied as read-only context. The reusable React dubbing panel is available at `@deepbench/studio-dubbing/react`; the playground demonstrates the application shell and timeline controls. Run its interactive browser checks with `pnpm test:playground`.
+The loading message and supporting copy are in a polite, atomic `role="status"` region. Decorative marks and the CSS indicator are hidden from assistive technology. Reduced-motion preferences disable rotation while retaining the indicator and readable status. The layout uses fluid width, wrapping copy, flexible spacing and minimum rather than fixed viewport height so content can scroll vertically when enlarged.
 
-## Using the packages together
+## Verification — 2026-10-31
 
-```tsx
-import { IndexedDBFileSystem } from '@deepbench/browser-filesystem';
-import { createBrowserAgent } from '@deepbench/browser-deepagents';
-import { exportComposition, titleCardComposition } from '@deepbench/browser-remotion';
-
-const filesystem = new IndexedDBFileSystem({ databaseName: 'my-project' });
-const agent = createBrowserAgent({ filesystem, model });
-// `model` is an application-supplied LangChain chat model with tool calling.
-await agent.invoke({ messages: [{
-  role: 'user',
-  content: 'Write /video.json containing title and background strings for a title card.',
-}] });
-const props = JSON.parse(new TextDecoder().decode(await filesystem.readFile('/video.json')));
-if (typeof props.title !== 'string' || typeof props.background !== 'string') {
-  throw new Error('Invalid title-card parameters');
-}
-const blob = await exportComposition({ ...titleCardComposition, inputProps: props });
-// Download/upload the Blob, or persist small outputs in the workspace:
-await filesystem.writeFile('/output.mp4', new Uint8Array(await blob.arrayBuffer()));
-await filesystem.close();
-```
-
-Applications supply model and image-generation adapters; the development playground provides a local gateway for credentials. Compilation, sandboxed Remotion previews, frame capture, music synthesis, storage, and video export run in the browser. The ad harness runs planning, design, rendering, and configurable visual review. Browser storage is origin-local and subject to quotas. Video export requires HTTPS/localhost and a supported browser encoder.
-
-## Embed in another app
-
-See [the studio package](packages/studio/README.md) for the React component, headless session, skills, adapters, portable install, and current browser limitations. Open http://localhost:5180/?mode=ad for the source-based workflow.
-
-## Publishing
-
-See [PUBLISHING.md](PUBLISHING.md) for the npm release workflow and one-time trusted publisher setup. The installable artifact is `@framecraft/studio`; internal packages remain private.
+- Rechecked `/workspace`: unborn `master`, only `.cp` metadata, no existing app, tests or build commands.
+- Served HTML and CSS locally with Python; both returned HTTP 200 and matched the source files.
+- Source checks passed for one status region, local-only asset references and the reduced-motion animation override. No script or external CSS imports exist.
+- Browser verification is **unavailable in this runner**. Playwright 1.64.1 and Chromium were provisioned outside the repository, but Chromium could not launch because the system library `libglib-2.0.so.0` is missing. Thus visual rendering, computed overflow, accessibility-tree output and reduced-motion emulation could not be verified. No browser check is claimed as passing.
+- Remaining browser checks: inspect at 320px and desktop widths, repeat at actual 200% browser zoom, confirm no horizontal overflow, emulate reduced motion and confirm the indicator is static, inspect the status in the accessibility tree, and confirm the Network panel shows only local requests. Test with a screen reader if available; initial live-region announcement behavior varies by browser and assistive technology.
