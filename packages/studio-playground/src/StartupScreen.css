@@ -1,3 +1,6 @@
+:root{--c-101214:#101214;--c-211b17:#211b17;--c-211b18:#211b18;--c-38302b:#38302b;--c-5a4035:#5a4035;--c-aeb4ba:#aeb4ba;--c-f1a075:#f1a075;--c-f1eee7:#f1eee7;--c-f4bca0:#f4bca0;--c-ffc09c:#ffc09c;}
+:root[data-theme=light]{color-scheme:light;--c-101214:#ebedef;--c-211b17:#e8e2de;--c-211b18:#e7e1de;--c-38302b:#d4ccc7;--c-5a4035:#cab0a5;--c-aeb4ba:#454b51;--c-f1a075:#8a390e;--c-f1eee7:#18150e;--c-f4bca0:#5f270b;--c-ffc09c:#632400;}
+@media (prefers-color-scheme: light){:root:not([data-theme]){color-scheme:light;--c-101214:#ebedef;--c-211b17:#e8e2de;--c-211b18:#e7e1de;--c-38302b:#d4ccc7;--c-5a4035:#cab0a5;--c-aeb4ba:#454b51;--c-f1a075:#8a390e;--c-f1eee7:#18150e;--c-f4bca0:#5f270b;--c-ffc09c:#632400;}}
 /* Apply the margin reset only while this screen is in the document. */
 body:has(.framecraft-startup) { margin: 0; }
 
@@ -8,27 +11,27 @@ body:has(.framecraft-startup) { margin: 0; }
   min-height: 100vh;
   min-height: 100dvh;
   padding: 48px 24px;
-  background: #101214;
-  color: #f1eee7;
+  background: var(--c-101214);
+  color: var(--c-f1eee7);
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   font-size: 16px;
   line-height: 1.6;
   text-align: center;
-  color-scheme: dark;
+  
 }
 
 .framecraft-startup .framecraft-startup__content { width: 100%; max-width: 420px; min-width: 0; overflow-wrap: anywhere; }
 .framecraft-startup .framecraft-startup__wordmark { font-size: clamp(30px, 7vw, 40px); font-weight: 650; letter-spacing: -1.5px; line-height: 1.2; }
-.framecraft-startup__wordmark > span { display: inline-block; color: #f1a075; }
-.framecraft-startup .framecraft-startup__indicator { width: 56px; height: 4px; margin: 40px auto 28px; border-radius: 4px; background: #38302b; overflow: hidden; }
-.framecraft-startup__indicator > span { display: block; width: 24px; height: 100%; border-radius: inherit; background: #f1a075; transform: translateX(16px); }
+.framecraft-startup__wordmark > span { display: inline-block; color: var(--c-f1a075); }
+.framecraft-startup .framecraft-startup__indicator { width: 56px; height: 4px; margin: 40px auto 28px; border-radius: 4px; background: var(--c-38302b); overflow: hidden; }
+.framecraft-startup__indicator > span { display: block; width: 24px; height: 100%; border-radius: inherit; background: var(--c-f1a075); transform: translateX(16px); }
 .framecraft-startup__indicator[data-loading='true'] > span { animation: framecraft-startup-drift 1.8s ease-in-out infinite alternate; }
 .framecraft-startup h1 { margin: 0; font-size: 22px; font-weight: 550; letter-spacing: -.4px; line-height: 1.4; }
-.framecraft-startup .framecraft-startup__support { margin: 12px 0 0; color: #aeb4ba; }
-.framecraft-startup .framecraft-startup__error { margin: 24px 0 0; padding: 14px 16px; border: 1px solid #5a4035; border-radius: 8px; background: #211b18; color: #f4bca0; font-size: 14px; text-align: left; white-space: pre-wrap; }
-.framecraft-startup button { margin-top: 24px; max-width: 100%; padding: 11px 20px; border: 1px solid #f1a075; border-radius: 7px; background: #f1a075; color: #211b17; font: inherit; font-weight: 650; cursor: pointer; overflow-wrap: anywhere; }
-.framecraft-startup button:hover { background: #ffc09c; border-color: #ffc09c; }
-.framecraft-startup button:focus-visible { outline: 2px solid #f1eee7; outline-offset: 5px; }
+.framecraft-startup .framecraft-startup__support { margin: 12px 0 0; color: var(--c-aeb4ba); }
+.framecraft-startup .framecraft-startup__error { margin: 24px 0 0; padding: 14px 16px; border: 1px solid var(--c-5a4035); border-radius: 8px; background: var(--c-211b18); color: var(--c-f4bca0); font-size: 14px; text-align: left; white-space: pre-wrap; }
+.framecraft-startup button { margin-top: 24px; max-width: 100%; padding: 11px 20px; border: 1px solid var(--c-f1a075); border-radius: 7px; background: var(--c-f1a075); color: var(--c-211b17); font: inherit; font-weight: 650; cursor: pointer; overflow-wrap: anywhere; }
+.framecraft-startup button:hover { background: var(--c-ffc09c); border-color: var(--c-ffc09c); }
+.framecraft-startup button:focus-visible { outline: 2px solid var(--c-f1eee7); outline-offset: 5px; }
 
 @keyframes framecraft-startup-drift { from { transform: translateX(0); } to { transform: translateX(32px); } }
 @media (prefers-reduced-motion: reduce) {
