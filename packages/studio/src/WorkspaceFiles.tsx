@@ -106,12 +106,13 @@ export function WorkspaceFiles({session, files, busy, target, refresh, onDirtyCh
     finally {setSaving(false);}
   };
   return <section className="file-workspace panel" aria-label="Conversation files">
-    <div className="panel-heading"><div><h2>Conversation files</h2><p className="muted">{files.length} files · Saved in this browser</p></div><button onClick={refresh}>Refresh files</button></div>
+    <div className="panel-heading"><div><h2>Conversation files</h2><p className="muted">{files.length === 1 ? '1 file' : `${files.length} files`} · Saved in this browser</p></div><button onClick={refresh}>Refresh files</button></div>
     <div className="file-layout"><FileTree files={files} selected={path} onSelect={choose} /><div className="file-editor"><h3>{path}{dirty ? ' • Unsaved' : ''}</h3>
       {error && <p role="alert">{error}</p>}
+      {!error && loaded?.path !== path && <p className="muted" role="status">Loading {path}…</p>}
       {dirty && loadedSignature !== signature && <p role="status">This file changed on disk. Your draft is preserved; save will check for conflicts.</p>}
       {loaded?.path === path && loaded.text !== undefined && <><MonacoFileEditor path={path} value={draft} readOnly={!loaded.editable || saving} onChange={setDraft} onSave={value => void save(value)} /><div className="file-actions"><button disabled={!dirty || !loaded.editable || busy || saving} onClick={() => void save()}>Save file</button><button disabled={!dirty || saving} onClick={discard}>Discard edits and reload</button><small>{loaded.editable ? busy ? 'Save is available after the agent finishes.' : path === '/project.json' ? 'Saving validates the timeline and creates a revision.' : 'Text files are editable. Ad.tsx updates the source studio preview.' : path.startsWith('/context/') ? 'Product context is read-only. Supply a new context version from the host to change it.' : 'Application history is read-only.'}</small></div></>}
-      {loaded?.path === path && loaded.url && <><div className="file-media">{loaded.mime.startsWith('image/') ? <img src={loaded.url} alt={path} /> : loaded.mime.startsWith('audio/') ? <audio src={loaded.url} controls /> : loaded.mime.startsWith('video/') ? <video src={loaded.url} controls /> : <p>Binary file · read-only</p>}</div><a href={loaded.url} download={path.split('/').at(-1)}>Download file</a></>}
+      {loaded?.path === path && loaded.url && <><div className="file-media">{loaded.mime.startsWith('image/') ? <img src={loaded.url} alt={path} /> : loaded.mime.startsWith('audio/') ? <audio src={loaded.url} controls /> : loaded.mime.startsWith('video/') ? <video src={loaded.url} controls /> : <p className="muted">Binary file · read-only</p>}</div><a href={loaded.url} download={path.split('/').at(-1)}>Download file</a></>}
     </div></div>
   </section>;
 }
@@ -133,7 +134,7 @@ function FileTree({files, selected, onSelect}: {files: FileStat[]; selected: str
   const render = (node: TreeNode, depth: number): ReactNode => [...node.children.values()].sort((a, b) => Number(!!a.file) - Number(!!b.file) || a.name.localeCompare(b.name)).map(child => child.file ?
     <button key={child.path} className={selected === child.path ? 'active' : ''} aria-label={child.path} aria-current={selected === child.path ? 'page' : undefined} style={{paddingLeft: 14 + depth * 16}} onClick={() => onSelect(child.path)}><span className="file-tree-icon">◇</span><span>{child.name}</span><small>{child.file.size < 1024 ? `${child.file.size} B` : `${Math.ceil(child.file.size / 1024)} KB`}</small></button> :
     <div key={child.path}><button className="file-tree-folder" style={{paddingLeft: 14 + depth * 16}} aria-expanded={!collapsed.has(child.path)} aria-label={`Folder ${child.path}`} onClick={() => setCollapsed(old => {const next = new Set(old); if (next.has(child.path)) next.delete(child.path); else next.add(child.path); return next;})}><span className="file-tree-icon">{collapsed.has(child.path) ? '▸' : '▾'}</span>{child.name}</button>{!collapsed.has(child.path) && render(child, depth + 1)}</div>);
-  return <nav aria-label="File list"><span className="file-tree-heading">EXPLORER</span>{render(root, 0)}</nav>;
+  return <nav aria-label="File list"><span className="file-tree-heading">EXPLORER</span>{files.length ? render(root, 0) : <p className="muted">No files yet.</p>}</nav>;
 }
 
 export function WorkspaceChanges({changes, watching, onWatch, refresh, clearChanges, onOpen}: {changes: FileChange[]; watching: boolean; onWatch(value: boolean): void; refresh(): void; clearChanges(): void; onOpen(path: string): void}) {
