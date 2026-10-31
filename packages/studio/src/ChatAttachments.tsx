@@ -18,7 +18,7 @@ export function ChatAttachments({attachments,disabled,loading,error,onFiles,onRe
   const input=useRef<HTMLInputElement>(null);
   return <section className="chat-attachments" aria-label="Feedback attachments">
     <input ref={input} type="file" multiple hidden aria-label="Attach feedback files" accept="image/png,image/jpeg,image/webp,image/gif,text/*,.txt,.md,.csv,.json,.log,.yaml,.yml,.tsx,.ts,.jsx,.js" onChange={event=>{const files=Array.from(event.target.files??[]);event.target.value='';onFiles(files);}}/>
-    <div className="feedback-heading"><button type="button" disabled={disabled||loading} onClick={()=>input.current?.click()}>＋ Attach feedback</button><small>Drop images or text here</small></div>
+    <div className="feedback-heading"><button type="button" aria-label="Attach feedback files" disabled={disabled||loading} onClick={()=>input.current?.click()}>＋ Attach feedback</button><small>{attachments.length?`${attachments.length} of ${feedbackLimits.files} attached`:'No files attached. Drop images or text here.'}</small></div>
     {attachments.map((attachment,index)=><div className="feedback-file" key={`${index}:${attachment.name}`}>
       {attachment.mimeType.startsWith('image/')?<img src={attachment.data} alt={`Feedback: ${attachment.name}`}/>:<span aria-hidden="true">TXT</span>}
       <span title={attachment.name}>{attachment.name}</span><button type="button" aria-label={`Remove attachment ${attachment.name}`} disabled={disabled||loading} onClick={()=>onRemove(index)}>×</button>
