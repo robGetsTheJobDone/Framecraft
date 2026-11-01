@@ -49,8 +49,8 @@ export function useWorkspace(session: StudioSession | undefined, onProject: (pro
   return {files, changes, error, refresh: () => setTick(t => t + 1), clearChanges: () => setChanges([])};
 }
 
-type Props = {saveFile?(path:string,content:string,expectedContent:string):Promise<void>; session: StudioSession; files: FileStat[]; busy: boolean; target?: string; refresh(): void; onDirtyChange(dirty: boolean): void};
-export function WorkspaceFiles({session, files, busy, target, refresh, onDirtyChange, saveFile}: Props) {
+type Props = {theme?: "light" | "dark"; saveFile?(path:string,content:string,expectedContent:string):Promise<void>; session: StudioSession; files: FileStat[]; busy: boolean; target?: string; refresh(): void; onDirtyChange(dirty: boolean): void};
+export function WorkspaceFiles({session, files, busy, target, refresh, onDirtyChange, saveFile, theme}: Props) {
   const [path, setPath] = useState(target ?? (files.some(file => file.path === '/Ad.tsx') ? '/Ad.tsx' : '/brief.md'));
   const [loaded, setLoaded] = useState<{path: string; text?: string; url?: string; mime: string; editable: boolean}>();
   const [draft, setDraft] = useState('');
@@ -111,7 +111,7 @@ export function WorkspaceFiles({session, files, busy, target, refresh, onDirtyCh
       {error && <p role="alert">{error}</p>}
       {!error && loaded?.path !== path && <p className="muted" role="status">Loading {path}…</p>}
       {dirty && loadedSignature !== signature && <p role="status">This file changed on disk. Your draft is preserved; save will check for conflicts.</p>}
-      {loaded?.path === path && loaded.text !== undefined && <><MonacoFileEditor path={path} value={draft} readOnly={!loaded.editable || saving} onChange={setDraft} onSave={value => void save(value)} /><div className="file-actions"><button disabled={!dirty || !loaded.editable || busy || saving} onClick={() => void save()}>Save file</button><button disabled={!dirty || saving} onClick={discard}>Discard edits and reload</button><small>{loaded.editable ? busy ? 'Save is available after the agent finishes.' : path === '/project.json' ? 'Saving validates the timeline and creates a revision.' : 'Text files are editable. Ad.tsx updates the source studio preview.' : path.startsWith('/context/') ? 'Product context is read-only. Supply a new context version from the host to change it.' : 'Application history is read-only.'}</small></div></>}
+      {loaded?.path === path && loaded.text !== undefined && <><MonacoFileEditor theme={theme} path={path} value={draft} readOnly={!loaded.editable || saving} onChange={setDraft} onSave={value => void save(value)} /><div className="file-actions"><button disabled={!dirty || !loaded.editable || busy || saving} onClick={() => void save()}>Save file</button><button disabled={!dirty || saving} onClick={discard}>Discard edits and reload</button><small>{loaded.editable ? busy ? 'Save is available after the agent finishes.' : path === '/project.json' ? 'Saving validates the timeline and creates a revision.' : 'Text files are editable. Ad.tsx updates the source studio preview.' : path.startsWith('/context/') ? 'Product context is read-only. Supply a new context version from the host to change it.' : 'Application history is read-only.'}</small></div></>}
       {loaded?.path === path && loaded.url && <><div className="file-media">{loaded.mime.startsWith('image/') ? <img src={loaded.url} alt={path} /> : loaded.mime.startsWith('audio/') ? <audio src={loaded.url} controls /> : loaded.mime.startsWith('video/') ? <video src={loaded.url} controls /> : <p className="muted">Binary file · read-only</p>}</div><a href={loaded.url} download={path.split('/').at(-1)}>Download file</a></>}
     </div></div>
   </section>;
