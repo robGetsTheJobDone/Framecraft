@@ -6,6 +6,7 @@ import {flushSync} from 'react-dom';
 import {Player, Thumbnail} from '@remotion/player';
 import * as Remotion from 'remotion';
 import {toPng} from 'html-to-image';
+import {resolveImageSource, imageDecodeError} from './image-sources.js';
 import type {SceneComposition, SceneComponent, SceneInstance} from '@deepbench/studio-project';
 
 
@@ -43,9 +44,32 @@ window.addEventListener('message', async event => {
     const module = {exports: {} as {default?: React.ComponentType<any> | Record<string, React.ComponentType<any>>}};
     const node=(globalThis as any).__framecraftNodeCompat?.createNodeCompatibility(config.filesystem??[]);
     if(node){Object.assign(globalThis,{Buffer:node.Buffer,process:node.process});}
-    const require = (id: string) => {if (id === 'react') return React; if(id==='react/jsx-runtime')return JSXRuntime; if(id==='react/jsx-dev-runtime')return JSXDevRuntime; if (id === 'remotion') return Remotion; if(node)return node.require(id);throw new Error(`Unsupported import: ${id}`);};
+    const Img = React.forwardRef<HTMLImageElement, React.ComponentProps<typeof Remotion.Img>>((props, ref) => {
+      return <Remotion.Img {...props} src={resolveImageSource(props.src, config.assets, config.imageAssets)} ref={ref} />;
+    });
+    const resolveDOMImage = (image: HTMLImageElement) => {
+      const source = image.getAttribute('src');
+      const resolved = resolveImageSource(source, config.assets, config.imageAssets);
+      if (source !== resolved) image.setAttribute('src', resolved);
+      return resolved;
+    };
+    // Native <img> elements also work in the live preview, not just frame capture.
+    const images = new MutationObserver(records => {
+      try {
+        for (const record of records) {
+          if (record.type === 'attributes' && record.target instanceof HTMLImageElement) resolveDOMImage(record.target);
+          for (const node of record.addedNodes) if (node instanceof Element) {
+            if (node instanceof HTMLImageElement) resolveDOMImage(node);
+            for (const image of node.querySelectorAll('img')) resolveDOMImage(image);
+          }
+        }
+      } catch (error) {send({error: error instanceof Error ? error.message : String(error)});}
+    });
+    images.observe(document.getElementById('root')!, {subtree: true, childList: true, attributes: true, attributeFilter: ['src']});
+    const remotion = {...Remotion, Img};
+    const require = (id: string) => {if (id === 'react') return React; if(id==='react/jsx-runtime')return JSXRuntime; if(id==='react/jsx-dev-runtime')return JSXDevRuntime; if (id === 'remotion') return remotion; if(node)return node.require(id);throw new Error(`Unsupported import: ${id}`);};
     const names = ['useCurrentFrame','useVideoConfig','interpolate','interpolateColors','spring','Easing','Sequence','Series','AbsoluteFill','Img','Freeze','Loop','random'];
-    new Function('module', 'exports', 'require', 'React', ...names, config.code)(module, module.exports, require, React, ...names.map(name => (Remotion as any)[name]));
+    new Function('module', 'exports', 'require', 'React', ...names, config.code)(module, module.exports, require, React, ...names.map(name => (remotion as any)[name]));
     const exported = module.exports.default;
     const composition = config.composition as SceneComposition | undefined;
     let Ad: React.ComponentType<any>;
@@ -74,7 +98,10 @@ window.addEventListener('message', async event => {
       flushSync(() => root.render(<Thumbnail {...common} frameToDisplay={frame} style={{width: props.width, height: props.height}} />));
       await document.fonts.ready;
       await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
-      await Promise.all(Array.from(document.images).map(img => img.decode()));
+      await Promise.all(Array.from(document.images).map(async img => {
+        const source = resolveDOMImage(img);
+        try {await img.decode();} catch (error) {throw imageDecodeError(source, config.assets, error);}
+      }));
       return toPng(document.getElementById('root')!, {width: props.width, height: props.height, pixelRatio: 1, skipFonts: true});
     };
     if (config.mode === 'export') {

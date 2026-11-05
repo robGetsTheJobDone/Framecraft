@@ -112,6 +112,12 @@ Use the `onReady(session)` callback to access the session. `onEvent(event)` rece
 
 Your app owns provider authentication. Shared provider credentials belong on your backend. Framecraft’s browser runtime does not require a rendering server; model and image requests still use the services supplied by your adapters.
 
+### Image references
+
+Scene components receive an `assets` map of asset IDs to embedded image URLs. Use `<Img src={assets[imageId]} />` and pass `assets` into nested components. Asset input props contain IDs; resolve them through this map. Use the resolved URL for CSS backgrounds too.
+
+The renderer also resolves exact registered image IDs and virtual workspace paths in Remotion `<Img>` and native `<img>`, including live preview. Unknown references suggest matching names, paths, and `assets["id"]` expressions. Ambiguous paths and typos are never silently assigned an image. This resolver reads the supplied image inventory; it does not fetch URLs or access arbitrary files. A missing reference is reported separately from an embedded image that actually fails decoding, so the agent can repair references while preserving the requested photographs.
+
 ## Use the session without the UI
 
 ```ts

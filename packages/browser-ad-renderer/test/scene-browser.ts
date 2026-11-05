@@ -30,7 +30,34 @@ async function pixel(input:AdRenderInput,frame:number) {
  const memoInput=structuredClone(input);
  memoInput.modules!['/scene.tsx']=`import React from 'react';import {AbsoluteFill} from 'remotion';export default React.memo(React.forwardRef(function Scene(props,ref){return <AbsoluteFill style={{background:'#00ff00'}}/>}));`;
  const memo=await pixel(memoInput,3);
+ const canvas=document.createElement('canvas');canvas.width=64;canvas.height=64;const paint=canvas.getContext('2d')!;paint.fillStyle='#00ff00';paint.fillRect(0,0,64,64);
+ const photoInput=structuredClone(legacyInput);photoInput.assets.photo=canvas.toDataURL('image/jpeg');photoInput.composition!.components[0].assetBindings={hero:'photo'};
+ photoInput.composition!.components[0].inputs={imageId:{type:'asset'}};photoInput.composition!.scenes[0].props={imageId:'photo'};
+ photoInput.modules!['/scene.tsx']=`import {Img} from 'remotion';function Nested({assets,imageId}){return <Img src={assets[imageId]} style={{width:64,height:64}}/>}export default function Scene({assets,imageId}){return <Nested assets={assets} imageId={imageId}/>}`;
+ const photo=await pixel(photoInput,3);
+ photoInput.modules!['/scene.tsx']=`import {Img} from 'remotion';export default function Scene({assets}){return <Img src={assets.hero} style={{width:64,height:64}}/>}`;
+ const photoAlias=await pixel(photoInput,3);
+ const references:Record<string,number[]>={};
+ for(const [name,source] of Object.entries({
+  workspace:`import {Img} from 'remotion';export default function Scene(){return <Img src="assets/photo" style={{width:64,height:64}}/>}`,
+  rawId:`export default function Scene(){return <Img src="photo" style={{width:64,height:64}}/>}`,
+  native:`export default function Scene(){return <img src="/assets/photo" style={{width:64,height:64}}/>}`,
+ })) {photoInput.modules!['/scene.tsx']=source;references[name]=await pixel(photoInput,3);}
+ (window as any).openNativeImagePreview=async()=>{const preview=structuredClone(photoInput);preview.modules!['/scene.tsx']=`export default function Scene(){return <img src="assets/photo" style={{width:64,height:64}}/>}`;const mounted=await mountAd(document.body,preview,{mode:'preview',wasmURL:'/esbuild.wasm'});await mounted.result;};
+ const imageErrors:Record<string,string>={};
+ for(const [name,source] of Object.entries({
+  missing:`import {Img} from 'remotion';export default function Scene(){return <Img/>}`,
+  workspace:`import {Img} from 'remotion';export default function Scene(){return <Img src="assets/phoot"/>}`,
+  rawId:`export default function Scene(){return <Img src="phoot"/>}`,
+  native:`export default function Scene(){return <img src="/assets/phoot"/>}`,
+  corrupted:`export default function Scene({assets}){return <img src={assets.broken}/>} `,
+ })){
+  photoInput.modules!['/scene.tsx']=source;photoInput.assets.broken='data:image/jpeg;base64,bm90LWEtanBlZw==';
+  try{await renderAd(photoInput,{mode:'review',wasmURL:'/esbuild.wasm'});imageErrors[name]='NO ERROR';}catch(error){imageErrors[name]=String(error);}
+ }
+ photoInput.modules!['/scene.tsx']=`export default function Scene(){return <img src="assets/phoot"/>}`;
+ try{await pixel(photoInput,3);imageErrors.export='NO ERROR';}catch(error){imageErrors.export=String(error);}
  const review=await renderAd(input,{mode:'review',wasmURL:'/esbuild.wasm'});
  const exported=await renderAd(input,{mode:'export',container:'webm',wasmURL:'/esbuild.wasm'});
- return {snapshot,trim,move,dependency,localSeek,nested,alias,legacyGlobals,memo,reviewTimes:review.frames?.map(f=>f.timeSeconds),bytes:exported.blob?.size};
+ return {snapshot,trim,move,dependency,localSeek,nested,alias,legacyGlobals,memo,photo,photoAlias,references,imageErrors,reviewTimes:review.frames?.map(f=>f.timeSeconds),bytes:exported.blob?.size};
 };

@@ -3,7 +3,7 @@ import {createServer} from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import {build} from 'esbuild';
-import {chromium} from '@playwright/test';
+import {chromium,expect} from '@playwright/test';
 const root=fileURLToPath(new URL('../../../',import.meta.url));
 const bundle=await build({absWorkingDir:root,entryPoints:['packages/browser-ad-renderer/test/scene-browser.ts'],bundle:true,write:false,platform:'browser',format:'esm',minify:true,define:{'process.env.NODE_ENV':'"production"'}});
 const wasm=await readFile(new URL('../dist/esbuild.wasm',import.meta.url));
@@ -21,7 +21,14 @@ try {
  assert.deepEqual(result.alias,[0,255,0,255],'library asset aliases resolve to project assets');
  assert.deepEqual(result.legacyGlobals,[0,255,0,255],'legacy modules retain implicit React and Remotion globals');
  assert.deepEqual(result.memo,[0,255,0,255],'memo/forwardRef scene exports are valid React components');
+ for(const key of ['photo','photoAlias'])assert.ok(result[key][0]<10&&result[key][1]>245&&result[key][2]<10&&result[key][3]===255,'real JPEG assets render through IDs, nested props, and aliases');
+ assert.match(result.imageErrors.missing,/Image src is missing.*assets\[assetId\]/);
+ for(const pixel of Object.values(result.references))assert.ok(pixel[0]<10&&pixel[1]>245&&pixel[2]<10&&pixel[3]===255,'exact IDs and paths resolve to actual image bytes');
+ for(const key of ['workspace','rawId','native','export'])assert.match(result.imageErrors[key],/Possible matches:.*assets\["photo"\]/);
+ assert.match(result.imageErrors.corrupted,/Cannot decode asset "broken"/);
  assert.ok(result.reviewTimes.includes(3/30)&&result.reviewTimes.includes(4/30),'review samples short scene boundaries');
  assert.ok(result.bytes>100,'production export encodes structured scene graph');
+ await page.evaluate(()=>window.openNativeImagePreview());
+ await expect.poll(()=>page.frameLocator('iframe').locator('img').evaluate(img=>img.naturalWidth)).toBe(64);
  console.log('Production scene browser checks passed',result);
 }finally{await browser?.close();await new Promise(r=>server.close(r));}

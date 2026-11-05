@@ -5,8 +5,9 @@ import {Output, BufferTarget, Mp4OutputFormat, WebMOutputFormat, CanvasSource, A
 import * as esbuild from 'esbuild-wasm';
 import {harnessCode, tailwindCode} from './harness-code.js';
 import {needsNodeCompatibility,type RenderFile} from './node-builtins.js';
+import type {ImageAssetFile} from './image-sources.js';
 export interface AdFormat {id: string; width: number; height: number}
-export interface AdRenderInput {filesystem?:RenderFile[]; packages?:PackageLock; modules?: Record<string, string>; composition?: SceneComposition; source: string; assets: Record<string, string>; format: AdFormat; durationSeconds: number; fps: number; audioMix?: string}
+export interface AdRenderInput {filesystem?:RenderFile[]; packages?:PackageLock; modules?: Record<string, string>; composition?: SceneComposition; source: string; assets: Record<string, string>; imageAssets?:ImageAssetFile[]; format: AdFormat; durationSeconds: number; fps: number; audioMix?: string}
 export interface AdFrame {format: string; timeSeconds: number; dataUrl: string}
 let initialized: Promise<void> | undefined;
 let aacFallback: Promise<void> | undefined;
@@ -72,7 +73,7 @@ export async function mountAd(container: HTMLElement, input: AdRenderInput, opti
       if (typeof event.data?.stage === 'string' && !settled) {stage = event.data.stage; clearTimeout(timeout); timeout = setTimeout(timedOut, deadline); return;}
       if (pending && typeof event.data?.dataUrl === 'string') {pending.resolve(event.data.dataUrl); pending = undefined; return;}
       if (typeof event.data?.progress === 'number') {options.onProgress?.(event.data.progress); return;}
-      if (event.data?.error) {settled = true; reject(new Error(String(event.data.error))); dispose();}
+      if (event.data?.error) {const error = new Error(String(event.data.error)); settled = true; reject(error); dispose(error);}
       else if (event.data?.ready || event.data?.frames || event.data?.blob) {settled = true; clearTimeout(timeout); resolve(event.data);}
     };
   });
