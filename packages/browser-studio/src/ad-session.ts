@@ -1,5 +1,6 @@
 import {emptyPackageLock, verifyPackageLock, readPackageLock, inspectPackage, searchPackages, listPackageVersions, listPackageFiles, readPackageFile, probePackage, packageFailure, stagePackageInstall, packageLockPath, type PackagePolicy, type PackageSelection} from './packages.js';
 import type {VideoTranscriptionProvider} from './reverse-engineering.js';
+import {designerMessages} from './designer-messages.js';
 import {packageBuiltins, nodeBuiltinImports, needsNodeFilesystem, renderFileLimits, packageRuntimeVersions, type PackageLock} from '@deepbench/browser-ad-renderer';
 import {validateFeedback, feedbackBlocks, type FeedbackAttachment} from './feedback.js';
 import {createSessionLibrary, type SessionLibraryOptions} from './component-library-session.js';
@@ -455,7 +456,7 @@ export async function createAdSession(options: AdSessionOptions) {
           if (outstanding) response=savedResponse!;
           else if (typeof designer.stream === 'function') {
             let combined: any;
-            for await (const chunk of await designer.stream(messages,{signal})) {
+            for await (const chunk of await designer.stream(designerMessages(messages),{signal})) {
               signal.throwIfAborted(); combined=combined?combined.concat(chunk):chunk;
               const content=chunk.content;
               const delta=typeof content==='string'?content:Array.isArray(content)?content.filter(block=>block.type==='text').map(block=>String(block.text??'')).join(''):'';
@@ -463,7 +464,7 @@ export async function createAdSession(options: AdSessionOptions) {
             }
             if(!combined)throw new Error('Designer returned an empty stream');
             response=combined as AIMessage;
-          } else response=await designer.invoke(messages,{signal}) as AIMessage;
+          } else response=await designer.invoke(designerMessages(messages),{signal}) as AIMessage;
           if (!outstanding) {messages.push(response);cursor.toolIndex=0;syncCursor();await checkpoint('running');}
           if (!response.tool_calls?.length) {messages.push(new HumanMessage('Apply the requested change using the appropriate tool, then finish_design. For narration use request_voiceover; for music use compose_music/revise_music. Use write_ad only for visual source changes. Chat prose alone cannot apply an edit.'));cursor.turn=turn+1;syncCursor();await checkpoint('running');continue;}
           for (let index=cursor.toolIndex;index<response.tool_calls.length;index++) {
