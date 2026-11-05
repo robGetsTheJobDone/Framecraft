@@ -2,7 +2,7 @@ import {BaseChatModel} from '@langchain/core/language_models/chat_models';
 import {AIMessage, type BaseMessage} from '@langchain/core/messages';
 import {ChatOpenAI} from '@langchain/openai';
 import {encodeWav, decodeMediaAudio} from '@deepbench/studio-audio';
-import {createLangChainScriptProvider} from '@deepbench/browser-studio';
+import {createLangChainScriptProvider, type VideoTranscriptionProvider} from '@deepbench/browser-studio';
 import type {DubbingWizardOptions} from '@deepbench/studio-dubbing';
 import type {StudioProject} from '@deepbench/studio-project';
 
@@ -93,5 +93,19 @@ export const serverImageProvider = {
     const blob = await response.blob();
     const image = await createImageBitmap(blob);
     try {return {blob, width: image.width, height: image.height};} finally {image.close();}
+  },
+};
+
+export const serverTranscriptionProvider: VideoTranscriptionProvider = {
+  async transcribe({audio, previousText, signal}) {
+    signal?.throwIfAborted();
+    const bytes = new Uint8Array(await audio.arrayBuffer());
+    let raw = '';
+    for (let offset = 0; offset < bytes.length; offset += 8192) raw += String.fromCharCode(...bytes.subarray(offset, offset + 8192));
+    const response = await fetch('/api/transcribe', {method: 'POST', signal, headers: {'Content-Type': 'application/json'}, body: JSON.stringify({audio: btoa(raw), previousText})});
+    const result = await response.json();
+    if (!response.ok) throw new Error(typeof result.error === 'string' ? result.error : result.error?.message || `Transcription failed (${response.status})`);
+    if (typeof result.text !== 'string' || !Array.isArray(result.languages) || result.languages.some((item: unknown) => !item || typeof item !== 'object' || !('code' in item) || typeof item.code !== 'string')) throw new Error('Transcription endpoint returned an invalid response.');
+    return {text: result.text, languages: result.languages.map((item: {code: string}) => item.code)};
   },
 };

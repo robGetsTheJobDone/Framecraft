@@ -24,3 +24,6 @@ export {verifyPackageIntegrity, validatePackageGraph, packageBuiltins, packageLi
 export type {PackageLock, PackageModule, InstalledPackage} from './packages.js';
 
 export {packageRuntimeVersions} from './runtime-versions.js';
+export {nodeBuiltinNames,nodeBuiltinImports,resolveNodeBuiltin,needsNodeFilesystem,renderFileLimits} from './node-builtins.js';
+export type {RenderFile} from './node-builtins.js';
+export {packageURLIdentity} from './package-urls.js';

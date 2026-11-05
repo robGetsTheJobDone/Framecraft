@@ -15,7 +15,13 @@ describe('virtual scene module graph',()=>{
     expect(result.outputFiles![0].text).toContain('red');
   });
   it('rejects missing, escaping, package, and dynamic imports',async()=>{
-    for(const source of [`import '../missing';`,`import '../../../outside';`,`import 'node:fs';`,`import('react');`]) await expect(build(createSceneBuildOptions({...modules,'/scenes/Hello.tsx':source+' export default ()=>null'},composition))).rejects.toThrow();
+    for(const source of [`import '../missing';`,`import '../../../outside';`,`import 'node:child_process';`,`import('react');`]) await expect(build(createSceneBuildOptions({...modules,'/scenes/Hello.tsx':source+' export default ()=>null'},composition))).rejects.toThrow();
+  });
+  it('resolves supported bare and node imports to the same sandbox runtime',async()=>{
+    const output=await build(createSceneBuildOptions({'/scenes/Hello.tsx':`import fs from 'fs';import {readFile} from 'node:fs/promises';import {Buffer} from 'buffer';export default ()=>[fs,readFile,Buffer]`},composition));
+    expect(output.outputFiles![0].text).toContain('require("node:fs")');
+    expect(output.outputFiles![0].text).toContain('require("node:fs/promises")');
+    expect(output.outputFiles![0].text).toContain('require("node:buffer")');
   });
   it('invalidates caches for shared helper changes, not timing or props changes',()=>{
     const key=sceneCompilationKey(modules,composition);

@@ -41,7 +41,9 @@ window.addEventListener('message', async event => {
       window.cancelAnimationFrame = id => {callbacks.delete(id);};
     }
     const module = {exports: {} as {default?: React.ComponentType<any> | Record<string, React.ComponentType<any>>}};
-    const require = (id: string) => {if (id === 'react') return React; if(id==='react/jsx-runtime')return JSXRuntime; if(id==='react/jsx-dev-runtime')return JSXDevRuntime; if (id === 'remotion') return Remotion; throw new Error(`Unsupported import: ${id}`);};
+    const node=(globalThis as any).__framecraftNodeCompat?.createNodeCompatibility(config.filesystem??[]);
+    if(node){Object.assign(globalThis,{Buffer:node.Buffer,process:node.process});}
+    const require = (id: string) => {if (id === 'react') return React; if(id==='react/jsx-runtime')return JSXRuntime; if(id==='react/jsx-dev-runtime')return JSXDevRuntime; if (id === 'remotion') return Remotion; if(node)return node.require(id);throw new Error(`Unsupported import: ${id}`);};
     const names = ['useCurrentFrame','useVideoConfig','interpolate','interpolateColors','spring','Easing','Sequence','Series','AbsoluteFill','Img','Freeze','Loop','random'];
     new Function('module', 'exports', 'require', 'React', ...names, config.code)(module, module.exports, require, React, ...names.map(name => (Remotion as any)[name]));
     const exported = module.exports.default;

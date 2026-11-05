@@ -33,6 +33,7 @@
     "@deepbench/studio-project": "workspace:*",
     "@langchain/core": "^1.2.14",
     "fflate": "0.8.2",
+    "mediabunny": "1.61.6",
     "zod": "^4.3.6"
   },
   "devDependencies": {

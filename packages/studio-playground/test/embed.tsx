@@ -8,7 +8,7 @@ import {renderAd} from '@deepbench/studio';
 import {encodeWav} from '@deepbench/studio-audio';
 import {AIMessage, AIMessageChunk} from '@langchain/core/messages';
 const source=`export default function Ad({width,height}) { const frame=useCurrentFrame(); return <div className="bg-blue-500" style={{width,height,position:'relative',color:'white',fontFamily:'Arial',overflow:'hidden'}}><h1 style={{fontSize:30,transform:'translateX('+frame+'px)'}}>Browser source</h1></div>; }`;
-const plan={concept:'Browser test',scenes:[{id:null,componentId:null,start:0,end:3,copy:'Browser source',visual:'Blue',motion:'Moving text',assetKeys:[]}],assets:[],nextChanges:['Write the source']};
+const plan={durationSeconds:null,concept:'Browser test',scenes:[{id:null,componentId:null,start:0,end:3,copy:'Browser source',visual:'Blue',motion:'Moving text',assetKeys:[]}],assets:[],nextChanges:['Write the source']};
 const calls: Array<{name:string; input:any}> = [];
 (window as any).modelCalls = calls;
 let designRuns = 0;

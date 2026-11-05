@@ -4,6 +4,7 @@ import { z } from "zod";
 const id = z.string().regex(/^[a-zA-Z0-9_-]{1,60}$/);
 export const adProductionPlanSchema = z.object({
   concept: z.string().min(1).max(600),
+  durationSeconds: z.number().finite().positive().nullable().describe('Requested new project duration in seconds; null preserves the current duration. Set only when the user requests a duration change. The designer must apply it with set_project_duration.'),
   scenes: z.array(z.object({
     id: id.nullable().describe('Existing or planned scene ID; null when not assigned'), componentId: id.nullable().describe('Existing or planned component ID; null when not assigned'),
     start: z.number().min(0), end: z.number().positive(),
@@ -19,11 +20,12 @@ export const adProductionPlanSchema = z.object({
 // Old saved plans predate scene identities. Normalize only persisted data; provider output stays strict.
 export const storedProductionPlanSchema = z.preprocess(value => {
   if (!value || typeof value !== 'object' || !('scenes' in value) || !Array.isArray(value.scenes)) return value;
-  return {...value, scenes:value.scenes.map(scene => scene && typeof scene === 'object'
+  return {durationSeconds:null, ...value, scenes:value.scenes.map(scene => scene && typeof scene === 'object'
     ? {id:null, componentId:null, ...scene} : scene)};
 }, adProductionPlanSchema);
 export type AdProductionPlan = z.infer<typeof adProductionPlanSchema>;
 export function validateProductionPlan(plan: AdProductionPlan, assets: Record<string,string>, duration: number, generated: Record<string,string>, options:{validateTiming?:boolean}={}) {
+  duration = plan.durationSeconds ?? duration;
   const keys=new Set(plan.assets.map(a=>a.key));
   if (keys.size!==plan.assets.length) throw new Error("Asset keys must be unique");
   for(const asset of plan.assets) {

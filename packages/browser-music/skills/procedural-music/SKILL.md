@@ -1,6 +1,6 @@
 ---
 name: procedural-music
-version: 2.0.0
+version: 2.0.1
 roles: [composer]
 ---
 
@@ -8,7 +8,7 @@ Compose a short instrumental soundtrack that supports the brief and scene timing
 
 Work with score JSON, never executable code or downloaded samples. Notes are MIDI pitches scheduled in beats. Select warm-pad for soft harmony, pluck for rhythmic chords, bass for the root groove, bell for accents, lead for melody, and kick/snare/hat for percussion. Use MIDI drum pitches 36/38/42. Keep short ads to six tracks and 256 notes unless the brief requires more.
 
-Each track exposes gain, pan and a patch: attack, release, cutoff, detune and brightness. Null patch values retain presets. Short attack and release give crisp rhythm; longer envelopes soften harmony; lower cutoff leaves room for speech. Keep velocities moderate.
+Each track exposes gain, pan and a patch: attack, release, cutoff, detune and brightness. Use `patch: null` unless an explicit override is needed. Null patch values retain presets; zero is not a placeholder for defaults. Patch attack is 0.001–2 seconds, release 0.005–3 seconds, cutoff 80–18000 Hz (not a normalized 0–1 control), detune −50–50 cents, and brightness 0–1. Short attack and release give crisp rhythm; longer envelopes soften harmony; lower cutoff leaves room for speech. Keep velocities moderate.
 
 For revisions preserve the existing musical identity and change the requested notes, instrument or patch. All notes must fit inside the project. Store the editable score together with MIDI and rendered audio; MIDI uses General MIDI timbres and cannot preserve the custom synth patch itself.
 

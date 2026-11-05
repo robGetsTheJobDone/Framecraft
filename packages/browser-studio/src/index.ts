@@ -276,5 +276,8 @@ export * from './component-library.js';
 export {validateFeedback,feedbackLimits} from './feedback.js';
 export type {FeedbackAttachment} from './feedback.js';
 
-export type {PackagePolicy} from './packages.js';
+export type {PackagePolicy, PackageSelection} from './packages.js';
 export type {PackageLock, InstalledPackage, PackageModule} from '@deepbench/browser-ad-renderer';
+
+export {reverseEngineerVideo, inspectVideoReference, resolveReferenceTrim, analyzeVideoReference, saveVideoBreakdown, readVideoBreakdown, videoBreakdownMarkdown, reverseEngineeringLimits, videoBreakdownSchema, groupReferenceFrames, referenceSampleTimes} from './reverse-engineering.js';
+export type {VideoReverseEngineeringResult, VideoBreakdown, ReferenceFrame, ReferenceMetadata, ReferenceTrim, ReferenceTranscript, PreparedVideoReference, VideoTranscriptionProvider, ReverseEngineeringOptions, ReverseEngineeringProgress} from './reverse-engineering.js';

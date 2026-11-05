@@ -9,6 +9,7 @@ export function openAIHandler(env, requestFetch = fetch, speech = synthesizeSpee
   const imageModel = env.OPENAI_IMAGE_MODEL || 'gpt-image-2.5-sunburst';
   const imageFallbackModel = env.OPENAI_IMAGE_FALLBACK_MODEL || 'gpt-image-2.5-flare';
   const speechModel = env.OPENAI_SPEECH_MODEL || 'gpt-realtime-2.1';
+  const transcriptionModel = env.OPENAI_TRANSCRIPTION_MODEL || 'gpt-transcribe';
   return async (req, res, next) => {
     const path = req.url?.split('?')[0];
     if (!path?.startsWith('/api/')) return next();
@@ -17,8 +18,8 @@ export function openAIHandler(env, requestFetch = fetch, speech = synthesizeSpee
     const host = req.headers.host;
     if (!host || !/^(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(host)) return json(403, {error: 'Local server only'});
     if (req.headers.origin && req.headers.origin !== `http://${host}` && req.headers.origin !== `https://${host}`) return json(403, {error: 'Cross-origin request rejected'});
-    if (path === '/api/config' && req.method === 'GET') return json(200, {configured: Boolean(key), model, imageModel, imageFallbackModel, speechModel, useResponsesApi: true});
-    const routes = {'/api/openai/v1/responses': 'responses', '/api/openai/v1/chat/completions': 'chat/completions', '/api/images/generate': 'images/generations', '/api/speech': 'audio/speech'};
+    if (path === '/api/config' && req.method === 'GET') return json(200, {configured: Boolean(key), model, imageModel, imageFallbackModel, speechModel, transcriptionModel, useResponsesApi: true});
+    const routes = {'/api/openai/v1/responses': 'responses', '/api/openai/v1/chat/completions': 'chat/completions', '/api/images/generate': 'images/generations', '/api/speech': 'audio/speech', '/api/transcribe': 'audio/transcriptions'};
     if (!routes[path]) return json(404, {error: 'Unknown API route'});
     if (req.method !== 'POST') return json(405, {error: 'POST required'});
     if (!key) return json(503, {error: 'Set OPENAI_API_KEY in the root .env and restart pnpm dev.'});
@@ -56,12 +57,21 @@ export function openAIHandler(env, requestFetch = fetch, speech = synthesizeSpee
       } else if (path === '/api/images/generate') {
         if (typeof input.prompt !== 'string' || !input.prompt.trim() || input.prompt.length > 16000) return json(400, {error: 'Provide an image prompt of 1–16000 characters'});
         body = {model: imageModel, prompt: input.prompt, n: 1, size: '1536x1024', output_format: 'png'};
+      } else if (path === '/api/transcribe') {
+        if (typeof input.audio !== 'string' || !input.audio.length || input.audio.length > 1400000 || !/^[A-Za-z0-9+/]+={0,2}$/.test(input.audio) || input.audio.length % 4 !== 0) return json(400, {error: 'Provide a base64 WAV audio chunk up to 1 MB'});
+        if (input.previousText !== undefined && (typeof input.previousText !== 'string' || input.previousText.length > 400)) return json(400, {error: 'Previous transcript context must be at most 400 characters'});
+        const audio = Buffer.from(input.audio, 'base64');
+        if (audio.length < 44 || audio.length > 1024 * 1024 || audio.toString('ascii', 0, 4) !== 'RIFF' || audio.toString('ascii', 8, 12) !== 'WAVE') return json(400, {error: 'Expected a WAV audio chunk'});
+        body = new FormData();
+        body.set('file', new Blob([audio], {type: 'audio/wav'}), 'reference.wav');
+        body.set('model', transcriptionModel);
+        if (input.previousText) body.set('prompt', input.previousText);
       } else {
         if (typeof input.text !== 'string' || !input.text.trim() || input.text.length > 4096) return json(400, {error: 'Speech text must contain 1–4096 characters'});
         const wav = await speech({key, model: speechModel, text: input.text, voice: input.voice || 'marin', signal: controller.signal});
         res.setHeader('Content-Type', 'audio/wav'); res.end(wav); return;
       }
-      const send = modelBody => requestFetch(`https://api.openai.com/v1/${routes[path]}`, {method: 'POST', signal: controller.signal, headers: {'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json'}, body: JSON.stringify(modelBody)});
+      const send = modelBody => requestFetch(`https://api.openai.com/v1/${routes[path]}`, {method: 'POST', signal: controller.signal, headers: {'Authorization': `Bearer ${key}`, ...(modelBody instanceof FormData ? {} : {'Content-Type': 'application/json'})}, body: modelBody instanceof FormData ? modelBody : JSON.stringify(modelBody)});
       let upstream = await send(body);
       let usedImageModel = imageModel;
       if (path === '/api/images/generate' && !upstream.ok && imageFallbackModel !== imageModel) {

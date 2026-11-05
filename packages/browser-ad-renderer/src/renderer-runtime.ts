@@ -4,8 +4,9 @@ import {createSceneBuildOptions, sceneCompilationKey} from './module-graph.js';
 import {Output, BufferTarget, Mp4OutputFormat, WebMOutputFormat, CanvasSource, AudioBufferSource, canEncodeVideo, canEncodeAudio} from 'mediabunny';
 import * as esbuild from 'esbuild-wasm';
 import {harnessCode, tailwindCode} from './harness-code.js';
+import {needsNodeCompatibility,type RenderFile} from './node-builtins.js';
 export interface AdFormat {id: string; width: number; height: number}
-export interface AdRenderInput {packages?:PackageLock; modules?: Record<string, string>; composition?: SceneComposition; source: string; assets: Record<string, string>; format: AdFormat; durationSeconds: number; fps: number; audioMix?: string}
+export interface AdRenderInput {filesystem?:RenderFile[]; packages?:PackageLock; modules?: Record<string, string>; composition?: SceneComposition; source: string; assets: Record<string, string>; format: AdFormat; durationSeconds: number; fps: number; audioMix?: string}
 export interface AdFrame {format: string; timeSeconds: number; dataUrl: string}
 let initialized: Promise<void> | undefined;
 let aacFallback: Promise<void> | undefined;
@@ -45,6 +46,7 @@ export async function mountAd(container: HTMLElement, input: AdRenderInput, opti
   const code = input.composition ? await compileSceneModules(input.modules ?? {}, input.composition, options.wasmURL, input.packages)
     : input.packages?.packages.length ? await compileSceneModules({'/Source.tsx':input.source},{version:1,components:[{id:'source',entry:'/Source.tsx',authoredDurationInFrames:frameCount}],scenes:[]},options.wasmURL,input.packages).then(code=>code+'\nmodule.exports = {default: module.exports.default.source};') : await compileAd(input.source, options.wasmURL);
   options.signal?.throwIfAborted();
+  const nodeScript=needsNodeCompatibility(code)?`<script>${escapeScript((await import('./node-compat-code.js')).nodeCompatCode)}</script>`:'';
   const frame = document.createElement('iframe'); frame.title = 'Ad composition'; frame.setAttribute('sandbox', 'allow-scripts');
   frame.style.cssText = `border:0;width:100%;aspect-ratio:${input.format.width}/${input.format.height};background:#fff;`;
   const channel = new MessageChannel();
@@ -54,7 +56,13 @@ export async function mountAd(container: HTMLElement, input: AdRenderInput, opti
   const dispose = (reason: Error = new Error('Render disposed')) => {if (disposed) return; disposed = true; pending?.reject(reason); pending = undefined; clearTimeout(timeout); options.signal?.removeEventListener('abort', abort); channel.port1.close(); frame.remove(); if (!settled) {settled = true; rejectResult(reason);}};
   const abort = () => dispose(new DOMException('Render cancelled', 'AbortError'));
   let stage = 'starting renderer';
-  const deadline = options.mode === 'export' ? 300000 : 60000;
+  // Preserve short-ad budgets and allow heavier, longer timelines more time per
+  // stage. These are inactivity limits, not a limit on the whole video export.
+  const timeoutScale = Math.max(1, input.durationSeconds / 10);
+  const deadline = options.mode === 'export'
+    ? Math.min(900000, 300000 * timeoutScale)
+    : Math.min(300000, 60000 * timeoutScale);
+  const captureDeadline = Math.min(300000, 30000 * timeoutScale);
   const timedOut = () => dispose(new Error(`Render timed out after ${deadline / 1000}s without completing ${stage} (${input.format.id}, ${input.format.width}×${input.format.height})`));
   let timeout = setTimeout(timedOut, deadline);
   const result = new Promise<{frames?: AdFrame[]; blob?: Blob}>((resolve, reject) => {
@@ -70,12 +78,12 @@ export async function mountAd(container: HTMLElement, input: AdRenderInput, opti
   });
   // A private transferred port connects this iframe to this render operation.
   frame.onload = () => frame.contentWindow?.postMessage({type: 'deepbench-render', config: {...input, reviewFrames: input.composition ? sceneReviewFrames(input.composition, frameCount) : undefined, code, mode: options.mode ?? 'preview', container: options.container ?? 'mp4'}}, '*', [channel.port2]);
-  frame.srcdoc = `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' blob:; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; connect-src 'none'; worker-src blob:;"><style>html,body{margin:0;}*{box-sizing:border-box}#root{overflow:hidden}*,*::before,*::after{animation:none!important;transition:none!important}</style><script>for(const key of ['localStorage','sessionStorage']){const values=new Map();Object.defineProperty(window,key,{value:{getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,String(v)),removeItem:k=>values.delete(k),clear:()=>values.clear(),key:i=>[...values.keys()][i]??null,get length(){return values.size}}});}</script><script>${escapeScript(tailwindCode)}</script></head><body><div id="root"></div><script>${escapeScript(harnessCode)}</script></body></html>`;
+  frame.srcdoc = `<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' blob:; style-src 'unsafe-inline'; img-src data: blob:; media-src data: blob:; font-src data:; connect-src 'none'; worker-src blob:;"><style>html,body{margin:0;}*{box-sizing:border-box}#root{overflow:hidden}*,*::before,*::after{animation:none!important;transition:none!important}</style><script>for(const key of ['localStorage','sessionStorage']){const values=new Map();Object.defineProperty(window,key,{value:{getItem:k=>values.get(k)??null,setItem:(k,v)=>values.set(k,String(v)),removeItem:k=>values.delete(k),clear:()=>values.clear(),key:i=>[...values.keys()][i]??null,get length(){return values.size}}});}</script><script>${escapeScript(tailwindCode)}</script></head><body><div id="root"></div>${nodeScript}<script>${escapeScript(harnessCode)}</script></body></html>`;
   container.append(frame); options.signal?.addEventListener('abort', abort, {once: true});
   if (options.signal?.aborted) abort();
   return {element: frame, result, dispose, captureFrame: (frame: number) => new Promise<string>((resolve, reject) => {
     if (disposed || pending) {reject(new Error('Renderer unavailable')); return;}
-    const timer = setTimeout(() => dispose(new Error(`Frame ${frame} capture timed out after 30s (${input.format.id})`)), 30000);
+    const timer = setTimeout(() => dispose(new Error(`Frame ${frame} capture timed out after ${captureDeadline / 1000}s (${input.format.id})`)), captureDeadline);
     pending = {resolve: value => {clearTimeout(timer); resolve(value);}, reject: error => {clearTimeout(timer); reject(error);}};
     channel.port1.postMessage({frame});
   })};

@@ -80,7 +80,7 @@ describe('structured scene editing',()=>{
  });
  it('agent scoped tools commit created modules and preserve manual scene changes',async()=>{
    const config=options();let turn=0;
-   config.adapters.model={withStructuredOutput:(_schema:unknown,{name}:{name:string})=>({invoke:async()=>name==='edit_plan'?{changes:['Change headline'],preserve:['Timing'],needsProductionPlan:false}:{concept:'Cards',scenes:[{id:null,componentId:null,start:0,end:8,copy:'Cards',visual:'Cards',motion:'None',assetKeys:[]}],assets:[],nextChanges:['Change headline']}}),bindTools:(tools:any[])=>({invoke:async(messages:any[])=>{
+   config.adapters.model={withStructuredOutput:(_schema:unknown,{name}:{name:string})=>({invoke:async()=>name==='edit_plan'?{changes:['Change headline'],preserve:['Timing'],needsProductionPlan:false}:{durationSeconds:null,concept:'Cards',scenes:[{id:null,componentId:null,start:0,end:8,copy:'Cards',visual:'Cards',motion:'None',assetKeys:[]}],assets:[],nextChanges:['Change headline']}}),bindTools:(tools:any[])=>({invoke:async(messages:any[])=>{
      expect(JSON.stringify(messages)).toContain('Choose scene boundaries for independent editing');expect(JSON.stringify(messages)).toContain('continuous animation or coordinated transition can stay within one scene component');
      const inspect=JSON.parse(await tools.find(t=>t.name==='inspect_project').invoke({}));
      return new AIMessage({content:'',tool_calls:turn++===0?[{id:'edit',name:'edit_scenes',args:{baseRevision:inspect.revision,operations:[{type:'updateScene',id:'one',patch:{props:{headline:'Agent'}}}]}}]:[{id:'done',name:'finish_design',args:{}}]});
@@ -105,7 +105,7 @@ describe('journaled revisions',()=>{
 
 describe('session library authorization and recovery',()=>{
  function publishingModel(onTools:(names:string[])=>void, publish:boolean){let turn=0;return {
-   withStructuredOutput:()=>({invoke:async()=>({concept:'Card',scenes:[{id:null,componentId:null,start:0,end:8,copy:'Card',visual:'Card',motion:'None',assetKeys:[]}],assets:[],nextChanges:['Save card']})}),
+   withStructuredOutput:()=>({invoke:async()=>({durationSeconds:null,concept:'Card',scenes:[{id:null,componentId:null,start:0,end:8,copy:'Card',visual:'Card',motion:'None',assetKeys:[]}],assets:[],nextChanges:['Save card']})}),
    bindTools:(tools:any[])=>{onTools(tools.map(t=>t.name));return {invoke:async()=>{
      if(turn++>0)return new AIMessage({content:'',tool_calls:[{id:'done',name:'finish_design',args:{}}]});
      if(publish)return new AIMessage({content:'',tool_calls:[{id:'publish',name:'save_library_component',args:{localComponentId:'card',componentId:'brand-card',version:'1',name:'Brand card'}}]});

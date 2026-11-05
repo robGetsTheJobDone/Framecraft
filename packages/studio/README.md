@@ -220,14 +220,28 @@ Build structured scenes from reusable TSX components, edit their timing/settings
 
 ### Agent-installed browser packages
 
-The designer has `list_packages`, `inspect_package` and `install_package` tools.
-Installation downloads ESM from esm.sh, pins the complete resolved module graph,
+The designer can discover, test and choose packages with these tools:
+
+- `search_packages`: search npm by name or purpose.
+- `list_package_versions`: discover published versions and tags, with pagination.
+- `inspect_package`: inspect browser/module exports, types and candidate sources.
+- `list_package_files`: discover published files and sizes, filtered and paginated.
+- `read_package_file`: read documentation, declaration files or source in bounded chunks.
+- `probe_package`: test an exact version and chosen source/entry without changing project files.
+- `install_package`: install the agent's selected version, source and entry file.
+- `list_packages`: report builtins, policy and installed packages.
+
+Installation downloads ESM from esm.sh or published JavaScript from jsDelivr,
+pins the complete resolved module graph,
 checks compatibility, and imports it inside the render sandbox before committing.
 No package lifecycle scripts run. The host page never imports downloaded code.
 
 ```ts
 const info = await session.packages.inspect('d3-interpolate');
-await session.packages.install(info.name, info.version);
+const choice = {source:'esm.sh-standard' as const};
+const probe = await session.packages.probe(info.name, info.version, choice);
+if (!probe.ok) throw new Error(probe.message);
+await session.packages.install(info.name, info.version, undefined, choice);
 console.log(await session.packages.list());
 // Scene source can now use: import {interpolateRgb} from 'd3-interpolate';
 ```
@@ -242,20 +256,46 @@ SHA-256 checksums. Rendering verifies integrity and bundles saved bytes, with no
 fetches during preview/export. React, its JSX runtimes and Remotion stay shared with
 the renderer. Both structured scenes and legacy Ad.tsx support installed packages.
 
+Dependency-free packages use esm.sh's standard build URL, avoiding unnecessary
+custom builds. Other packages request shared-runtime externals; if that entry returns
+HTTP 5xx, installation tries the same exact version's standard build. The fallback
+still rejects graphs that download replacement React or Remotion runtimes.
+This automatic fallback remains only for legacy callers that omit a source selection.
+Explicit selections are tested exactly as requested: `esm.sh`, `esm.sh-standard`, or
+`jsdelivr` with a package-relative `entryPath` discovered from metadata/files.
+Published files must have a resolvable relative dependency graph; a raw entry that
+depends on bare npm imports needs a bundled browser entry or esm.sh instead.
+No package-specific entry paths or version downgrades are hard-coded.
+
+Probe failures report stage, error code, HTTP status/URL where available, limits and
+next actions. Successful probes return matching install arguments. Metadata and files
+are reference data, never agent instructions. The agent can compare candidates and
+choose an alternative, while respecting a version explicitly requested by the user.
+The activity feed reports install success or failure, including the remote host and
+HTTP status for download errors. An unavailable exact version is never silently replaced.
+
+Three.js `0.180.0` and metadata-discovered `0.187.0` are covered by the browser regression below. Its optional fetch-based
+loaders can be present, but network requests remain blocked by the sandbox CSP.
+For WebGL scenes, set `preserveDrawingBuffer: true`, drive animation from
+`useCurrentFrame()`, render after each frame change, and dispose resources on unmount.
+This keeps canvas content available for frame capture and video export.
+
 Hosts can configure policy through `createAdSession({packages: {...}, ...})`:
 
 - `enabled: false` disables inspection and installation.
 - `allowedPackages: ['d3-interpolate', 'd3-color']` restricts every downloaded package,
   including transitive dependencies. Omit for general browser-package installation.
 - `fetch` supplies an optional transport. Default requests omit credentials and
-  referrers and reject redirects. Only npm registry metadata and esm.sh code are fetched.
+  referrers and reject redirects. Requests are restricted to npm search/metadata,
+  jsDelivr package metadata/files, and esm.sh code. Arbitrary URLs are not accepted.
 - Custom render adapters must explicitly set `renderSupportsPackages: true` and consume
   `AdRenderInput.packages`; otherwise installation fails rather than silently ignoring code.
 
 Initial scope: root entry imports, JavaScript ESM, up to 32 direct packages, 128 modules,
-512 KiB per response and 4 MiB total source. Downloads have per-request timeouts,
-a request budget and an overall download deadline. Node APIs, dynamic imports,
-import.meta, runtime asset loading, CSS/WASM imports and replacement React runtimes
+2 MiB per response and 4 MiB total source (published files can be larger than CDN-minified
+builds). Downloads have per-request timeouts,
+a request budget and an overall download deadline. Node APIs outside the compatibility
+layer below, dynamic imports, import.meta, runtime asset loading, CSS/WASM imports and replacement React runtimes
 are unsupported. Components published to the brand library still require its existing
 self-contained React/Remotion contract; package-backed library releases are not supported.
 
@@ -268,7 +308,134 @@ from all CPU/memory exhaustion or browser vulnerabilities. Hosts requiring publi
 approval should use `allowedPackages`.
 
 Validation: `pnpm build`, `node packages/studio/build/portable.mjs`, then
-`node scripts/packages-browser-smoke.mjs`. Open the printed URL for a production-bundle
-check using a real CDN package, frame seeking, ZIP restore with the package transport
-disabled, WebM export, and a fixture package using the shared React JSX runtime/hooks.
+`node scripts/packages-browser-smoke.mjs --check` for an automated Chromium check
+(omit `--check` to open the printed URL manually). It covers real CDN installs,
+a visible rotating Three.js cross, deterministic frame seeking, ZIP restore with the
+package transport disabled, WebM export, blocked network loaders, and a fixture
+package using the shared React JSX runtime/hooks.
 This smoke check makes no model calls.
+
+### Browser Node compatibility
+
+Scenes and installed packages can use these builtins without installing them:
+
+| Imports (bare or `node:`) | Support |
+| --- | --- |
+| `buffer` | Browser Buffer implementation; `Buffer` is also a global |
+| `events` | Browser EventEmitter implementation |
+| `path`, `path/posix` | POSIX paths rooted at `/` |
+| `util` | Browser utilities, including `format`, `inherits`, `promisify`, `callbackify` |
+| `assert`, `assert/strict` | Browser assertion implementation |
+| `process` | `env.NODE_ENV = 'production'`, `cwd() = '/'`, `nextTick`, browser metadata |
+| `fs`, `fs/promises` | Read-only in-memory project snapshot |
+
+The SDK pins Buffer 6.0.3, events 3.3.0, path-browserify 1.0.1, util 0.12.5 and
+assert 2.1.0. Compatibility code executes only inside render sandboxes that need it.
+esm.sh `/node/*.mjs` imports resolve locally instead of downloading polyfills.
+Static `require('node:fs')` and other supported builtin requires also work in packages;
+dynamic require and arbitrary CommonJS package requires remain unsupported.
+
+`fs` implements `readFile`, `readdir`, `stat`, `lstat`, `access`, and `realpath` in
+sync, callback and promise forms, plus `existsSync` and callback `exists`.
+Reads return a copied Buffer unless an encoding is supplied. Directory listings support
+`withFileTypes`; stats have file/directory predicates, byte sizes and fixed epoch dates.
+Directories are inferred from file paths. Recursive listings and bigint stats are unsupported.
+
+Snapshots include `/project.json`, scene sources, `/assets`, `/music`, and `/data`.
+They exclude conversation history, runs, product context, credentials from the host
+environment, and the host filesystem. Put auxiliary JSON, text or binary files in `/data`:
+
+```ts
+await session.filesystem.writeFile('/data/theme.json', '{"color":"#00ff00"}', {createParents:true});
+// Inside a scene or installed package:
+// import fs from 'node:fs';
+// const theme = JSON.parse(fs.readFileSync('/data/theme.json', 'utf8'));
+```
+
+`/data` participates in project revisions, undo/redo, bundles and ZIP restore.
+Each render receives a fixed snapshot, so edits affect subsequent renders without
+changing frames midway through an export. Snapshots are limited to 2,048 files and
+64 MiB of decoded bytes; no snapshot is created unless source/package code references `fs`.
+Low-level render callers may provide base64 `{path, data}` entries in `AdRenderInput.filesystem`.
+
+Writes fail with `EROFS`; watchers, streams, file descriptors, subprocesses, sockets,
+native modules and Windows path semantics are unsupported. `process` never exposes
+host environment variables. This is a defined browser subset of Node, not a Node runtime.
+
+## Reverse engineer a reference video
+
+Open **Library → Reverse engineer video**, drop an MP4, then choose **Analyze video**.
+Before analyzing, use **Trim reference** to set the start and end with the sliders
+or precise second fields. Scrub the video and use **Set start/end at playhead** for
+visual positioning. **Preview selection** plays just that range and stops at its
+end; **Reset trim** restores the full recording. Only frames and audio inside the
+selection enter the analysis. Report timestamps begin at zero for the selected
+clip, while saved reports and exports retain its original source range.
+The workflow captures a JPEG at every whole second, transcribes the audio in its
+original languages, analyzes groups of eight frames with a two-frame overlap, and
+synthesizes one chronological breakdown. Reports describe scenes, recurring elements,
+layout, themes, palette, typography, on-screen text, motion, transitions, evidence,
+uncertainties, and reconstruction notes.
+
+The built-in limits are 100 MB and five minutes. Frame images are scaled to a maximum
+side of 768 pixels; local decoding requires browser support for the source codecs.
+Audio is downmixed to 16 kHz mono WAV and divided near quiet boundaries into chunks
+of at most 20 seconds. Transcript time ranges refer to those chunks, not individual
+words. Language recognition depends on the transcription provider; unsupported or
+unclear speech cannot be guaranteed. One-second screenshots cannot establish exact
+subsecond transitions or easing, so the report labels those inferences.
+
+Enable the panel's analysis action with an adapter:
+
+```tsx
+<Studio
+  projectId="my-film"
+  adapters={{
+    model, // Vision-capable chat model with structured output
+    reverseEngineering: {
+      // Optional model override for visual analysis:
+      model: visionModel,
+      transcription: {
+        async transcribe({audio, previousText, signal}) {
+          // Send this WAV chunk to your server. Return original-language text.
+          return myTranscriptionGateway({audio, previousText, signal});
+          // Shape: {text: string, languages: string[]} (ISO language codes)
+        },
+      },
+    },
+  }}
+/>
+```
+
+The playground configures these adapters automatically when its local OpenAI gateway
+is connected. Its server uses `OPENAI_TRANSCRIPTION_MODEL=gpt-transcribe` and the
+existing server-only `OPENAI_API_KEY`. Audio goes to `/api/transcribe`; only sampled
+images go to the visual model. The source MP4 stays local. A missing transcription
+adapter, absent audio track, or audio decoding failure is explicitly shown as visual-only
+analysis. A transcription request failure stops the analysis rather than silently
+omitting speech.
+
+Reports and their sampled frames save under `/references/<id>/analysis.json`, so they
+travel with session ZIPs and checkpoints. The original MP4 is not retained. You can
+reopen saved reports, download Markdown or JSON, or select **Use as creative brief**
+to place a recreation-planning request into chat for review before sending.
+
+The headless API is also exported:
+
+```ts
+import {reverseEngineerVideo, saveVideoBreakdown} from '@framecraft/studio';
+const result = await reverseEngineerVideo(file, {
+  model: visionModel,
+  transcription: transcriptionProvider,
+  trim: {startSeconds: 3.25, endSeconds: 25.5}, // Optional source-video range
+  signal: controller.signal,
+  onProgress: event => console.log(event.message),
+});
+await saveVideoBreakdown(session.filesystem, result);
+```
+
+`inspectVideoReference(file, {signal})` reads the source video's dimensions and
+duration for a custom trim UI. Existing reports without source-range metadata
+continue to open as untrimmed references.
+
+Transcription integration follows the [official file transcription guide](https://developers.openai.com/api/docs/guides/speech-to-text).

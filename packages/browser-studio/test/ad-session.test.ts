@@ -7,7 +7,7 @@ import {adProductionPlanSchema,storedProductionPlanSchema} from '../src/producti
 import {z} from 'zod';
 import {createSkillRegistry} from '../src/skills.js';
 const source=(round:number)=>`export default function Ad(){return <div>Round ${round}</div>}`;
-const plan={concept:'A clear ad',scenes:[{id:null,componentId:null,start:0,end:8,copy:'Hi',visual:'Blue',motion:'Title entrance',assetKeys:[]}],assets:[],nextChanges:['Improve layout']};
+const plan={durationSeconds:null,concept:'A clear ad',scenes:[{id:null,componentId:null,start:0,end:8,copy:'Hi',visual:'Blue',motion:'Title entrance',assetKeys:[]}],assets:[],nextChanges:['Improve layout']};
 function model(needsProductionPlan=false) {
  let designs=0,reviews=0,plans=0;const evidence:unknown[]=[];
  return {stats:()=>({designs,reviews,plans,evidence}), model:{
@@ -113,6 +113,27 @@ describe('embeddable ad session',()=>{
   expect(clips).toHaveLength(1);expect(clips[0]).toMatchObject({script:'More orders, less stress.',startSeconds:0,durationSeconds:8});
   expect(project.assets.filter(asset=>asset.kind==='audio')).toHaveLength(0);
   expect(result.message).toContain('Click its ! clip');
+ });
+ it.each(['compose_music','revise_music'])('returns %s failures to the designer without losing earlier edits',async(name)=>{
+  const fake=model();let turn=0;let receivedError=false;
+  const musicModel={withStructuredOutput:()=>({invoke:async()=>{throw new Error('Invalid soundtrack controls');}})} as unknown as BaseChatModel;
+  fake.model.bindTools=(()=>({invoke:async(messages:any[])=>{
+   if(turn++===0)return new AIMessage({content:'',tool_calls:[
+    {id:'write',name:'write_ad',args:{source:source(1)}},
+    {id:'voice',name:'request_voiceover',args:{title:'Narration',script:'Keep this narration.',language:'en',startSeconds:0,durationSeconds:8}},
+    {id:'music',name,args:name==='compose_music'?{brief:'A gentle sting'}:{id:'missing-score',instructions:'Soften the sound'}},
+   ]});
+   const result=messages.find(message=>message.tool_call_id==='music');
+   expect(result?.content).toContain('Error:');receivedError=true;
+   return new AIMessage({content:'Music failed; keeping the visual and narration edits.',tool_calls:[{id:'done',name:'finish_design',args:{}}]});
+  }})) as never;
+  const session=await createAdSession({initialMode:'source',projectId:`recover-${name}`,music:{model:musicModel},adapters:{model:fake.model,storage:new MemoryFileSystem(),render:async()=>({frames:[{format:'story',timeSeconds:1,dataUrl:'data:image/png;base64,cGl4ZWxz'}]})}});
+  await session.send('Create visuals, narration, and music',{review:false});
+  expect(receivedError).toBe(true);expect(await session.workspace.read('Ad.tsx')).toBe(source(1));
+  const project=await session.store.load();
+  expect(project.tracks.flatMap(track=>track.clips).filter(clip=>clip.kind==='voiceover')).toHaveLength(1);
+  expect(project.assets.filter(asset=>asset.kind==='audio')).toHaveLength(0);
+  expect((await session.listRuns())[0].status).toBe('complete');
  });
  it('preserves working source when all renders fail and records failed proposals',async()=>{
   const fake=model();const session=await createAdSession({initialMode:'source' as const,projectId:'bad',adapters:{model:fake.model,storage:new MemoryFileSystem(),render:async()=>{throw new Error('Syntax error');}},review:{maxRounds:2}});

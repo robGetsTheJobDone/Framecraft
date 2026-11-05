@@ -8,7 +8,7 @@ import {createAdSession,importAdZip,type AdSessionOptions} from '../src/ad-sessi
 import type {StudioSession} from '../src/index.js';
 
 const vector=(round:number)=>`import React from 'react'; export default function Cartoon(){return <svg><text>Vector cartoon ${round}</text></svg>}`;
-const planned={concept:'A cartoon drawn with code',scenes:[{id:'cartoon',componentId:'cartoon',start:0,end:8,copy:'Cartoon',visual:'Vector illustration',motion:'Continuous animation',assetKeys:['cartoon-art']}],assets:[{key:'cartoon-art',description:'Planned artwork',action:'generate' as const,assetId:null}],nextChanges:['Draw the cartoon']};
+const planned={durationSeconds:null,concept:'A cartoon drawn with code',scenes:[{id:'cartoon',componentId:'cartoon',start:0,end:8,copy:'Cartoon',visual:'Vector illustration',motion:'Continuous animation',assetKeys:['cartoon-art']}],assets:[{key:'cartoon-art',description:'Planned artwork',action:'generate' as const,assetId:null}],nextChanges:['Draw the cartoon']};
 const invalid={...planned,assets:[{key:'cartoon-art',description:'Cartoon already drawn',action:'reuse' as const,assetId:'invented-cartoon-image'}]};
 function fixture(config:{corruptReviewPlan?:boolean;reviewFailure?:boolean;invalidFirst?:boolean;brokenRender?:boolean}={}){
  let plannerCalls=0,designerCalls=0,reviewerCalls=0,renderCalls=0;let candidate:StudioSession;

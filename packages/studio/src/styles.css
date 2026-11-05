@@ -102,3 +102,72 @@
 .deepbench-studio .feedback-file>span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px}
 .deepbench-studio .feedback-file button{margin-left:auto;padding:3px 7px}
 .deepbench-studio .feedback-error{color:#ffb2a6;font-size:12px;line-height:1.5;margin-top:8px}
+.deepbench-studio .reverse-modal{width:min(1120px,100%);padding:32px}
+.deepbench-studio .reverse-engineer{font-size:14px;line-height:1.6;overflow-wrap:anywhere}
+.deepbench-studio .reverse-engineer h2{font-size:28px;margin:8px 40px 8px 0}
+.deepbench-studio .reverse-engineer h3{font-size:23px;margin:8px 0}
+.deepbench-studio .reverse-engineer h4{font-size:15px;margin:10px 0}
+.deepbench-studio .reverse-intro{max-width:760px;color:#b0c0b8}
+.deepbench-studio .reference-drop{display:flex;flex-direction:column;align-items:center;gap:10px;margin:20px 0;padding:26px;border:1px dashed #748b7e;background:#18211d;border-radius:12px;text-align:center}
+.deepbench-studio .reference-drop.dragging{background:#2a4436;border-color:#c0ddc9}
+.deepbench-studio .reference-drop.has-file{flex-direction:row;flex-wrap:wrap;justify-content:space-between;padding:12px 16px;margin:14px 0;text-align:left}
+.deepbench-studio .reference-drop.has-file strong{overflow-wrap:anywhere;min-width:0}
+.deepbench-studio .reference-drop span,.deepbench-studio .reference-actions small{font-size:12px;color:#b0c0b8}
+.deepbench-studio .reference-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin:12px 0}
+.deepbench-studio .reference-launch{margin:12px 0}
+.deepbench-studio .reference-setup{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1fr);gap:16px;align-items:center;margin:16px 0}
+.deepbench-studio .reference-video{display:block;width:100%;max-height:350px;margin:0;background:#111;border-radius:10px}
+.deepbench-studio .reference-trim{padding:16px;border:1px solid #52695b;border-radius:10px;background:#18211d;min-width:0}
+.deepbench-studio .reference-trim-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.deepbench-studio .reference-trim h3{font-size:18px;margin:0}
+.deepbench-studio .reference-trim-heading span,.deepbench-studio .reference-selection{font-variant-numeric:tabular-nums;color:#d7bb8b}
+.deepbench-studio .reference-trim-rail{position:absolute;left:12px;right:12px;top:14px;height:10px;background:#39463f;border-radius:5px;overflow:hidden}
+.deepbench-studio .reference-trim-rail span{position:absolute;top:0;bottom:0;background:#dda178}
+.deepbench-studio .reference-trim-rail i{position:absolute;top:0;bottom:0;width:2px;background:#fff}
+.deepbench-studio .reference-trim-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;border:0;margin:0;padding:0;min-width:0}
+.deepbench-studio .reference-trim-controls legend{font-size:12px;color:#acbdb2;margin-bottom:12px}
+.deepbench-studio .reference-trim-controls>div{display:flex;flex-direction:column;gap:8px;min-width:0}
+.deepbench-studio .reference-trim-controls label{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.deepbench-studio .reference-trim-controls input[type=number]{width:100%;min-width:0;padding:8px 4px;font-variant-numeric:tabular-nums;text-align:center;appearance:textfield;-moz-appearance:textfield}
+.deepbench-studio .reference-trim-controls input[type=number]::-webkit-inner-spin-button,.deepbench-studio .reference-trim-controls input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+.deepbench-studio .reference-time-input{display:grid;grid-template-columns:32px minmax(0,1fr) 32px;gap:4px}
+.deepbench-studio .reference-time-input button{width:32px;height:36px;padding:4px!important;background:#3f4f43;border-color:#7d9883;font-size:14px!important;color:#f5d4b7}
+.deepbench-studio .reference-trim-controls button{align-self:start;font-size:12px}
+.deepbench-studio .reference-range{position:relative;height:38px;margin:18px 0 4px}
+.deepbench-studio .reference-range input[type=range]{position:absolute;inset:0;width:100%;height:38px;margin:0;padding:0;border:0;background:transparent;appearance:none;-webkit-appearance:none;pointer-events:none}
+.deepbench-studio .reference-range input[type=range]::-webkit-slider-runnable-track{height:38px;background:transparent;border:0}
+.deepbench-studio .reference-range input[type=range]::-moz-range-track{height:38px;background:transparent;border:0}
+.deepbench-studio .reference-range input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:24px;height:36px;margin-top:1px;border:2px solid #fff0df;border-radius:5px;background:#e5a578;box-shadow:0 1px 5px #0008;cursor:ew-resize;pointer-events:auto}
+.deepbench-studio .reference-range input[type=range]::-moz-range-thumb{width:20px;height:32px;border:2px solid #fff0df;border-radius:5px;background:#e5a578;box-shadow:0 1px 5px #0008;cursor:ew-resize;pointer-events:auto}
+.deepbench-studio .reference-range input:disabled::-webkit-slider-thumb{pointer-events:none;opacity:.5}
+.deepbench-studio .reference-range input:disabled::-moz-range-thumb{pointer-events:none;opacity:.5}
+.deepbench-studio .reference-range input:focus-visible{outline:none}
+.deepbench-studio .reference-range input:focus-visible::-webkit-slider-thumb{outline:3px solid #c9efd5;outline-offset:2px}
+.deepbench-studio .reference-range input:focus-visible::-moz-range-thumb{outline:3px solid #c9efd5;outline-offset:2px}
+.deepbench-studio .reference-range-labels{display:flex;justify-content:space-between;font-size:12px;color:#d7bb8b}
+@media(max-width:850px){.deepbench-studio .reference-setup{grid-template-columns:1fr}.deepbench-studio .reference-video{max-height:240px}}
+@media(max-width:450px){.deepbench-studio .reference-trim-controls{grid-template-columns:1fr;gap:14px}}
+.deepbench-studio .reference-saved{display:flex;gap:16px;align-items:center;margin:18px 0}
+.deepbench-studio .reference-saved select{max-width:70%}
+.deepbench-studio .reference-report{border-top:1px solid #4a5a50;margin-top:24px;padding-top:24px}
+.deepbench-studio .reference-caveat{padding:12px 16px;border-left:3px solid #d3b67f;background:#292b23;color:#d7d0b7;font-size:12px}
+.deepbench-studio .reference-style-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:20px 0}
+.deepbench-studio .reference-style-grid section{padding:14px;background:#18211d;border:1px solid #3f4c44;border-radius:8px}
+.deepbench-studio .reference-report ul{padding-left:20px}
+.deepbench-studio .reference-report li{margin:7px 0}
+.deepbench-studio .reference-scene{border:1px solid #4a5a50;border-radius:10px;margin:16px 0;padding:18px;background:#1b2420}
+.deepbench-studio .reference-scene-heading{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.deepbench-studio .reference-scene-heading>span,.deepbench-studio .reference-transcript time{font-family:monospace;color:#d7bb8b;font-size:12px}
+.deepbench-studio .reference-frames{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px;margin:12px 0}
+.deepbench-studio .reference-frames button,.deepbench-studio .reference-frames figure{margin:0;padding:5px;background:#111a15;border:1px solid #394a3f;border-radius:7px;text-align:center;font-size:12px}
+.deepbench-studio .reference-frames img{display:block;width:100%;height:110px;object-fit:contain;border-radius:4px}
+.deepbench-studio .reference-inspected{margin:12px 0;padding:12px;background:#111a15;border-radius:8px;text-align:center}
+.deepbench-studio .reference-inspected img{display:block;max-width:100%;max-height:440px;margin:auto;object-fit:contain}
+.deepbench-studio .reference-scene dl{display:grid;grid-template-columns:110px 1fr;gap:8px}
+.deepbench-studio .reference-scene dt{font-weight:600;color:#bacbbf}
+.deepbench-studio .reference-scene dd{margin:0}
+.deepbench-studio .reference-report summary{cursor:pointer;font-weight:600;margin:16px 0}
+.deepbench-studio .reference-transcript{padding:10px 18px;border:1px solid #4a5a50;border-radius:10px}
+.deepbench-studio .reference-transcript p{white-space:pre-wrap}
+.deepbench-studio .reference-error{color:#ffb4a0}
+@media(max-width:650px){.deepbench-studio .reverse-modal{padding:18px}.deepbench-studio .reference-style-grid{grid-template-columns:1fr}.deepbench-studio .reference-scene dl{grid-template-columns:1fr}.deepbench-studio .reference-saved{flex-wrap:wrap}}

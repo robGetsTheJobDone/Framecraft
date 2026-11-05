@@ -11,3 +11,5 @@ packages/studio/portable/
 *.tgz
 
 packages/browser-ad-renderer/src/runtime-versions.ts
+
+packages/browser-ad-renderer/src/node-compat-code.ts

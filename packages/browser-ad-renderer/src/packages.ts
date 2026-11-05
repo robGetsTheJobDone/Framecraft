@@ -1,9 +1,11 @@
 /** Downloaded code is data until bundled and executed inside the render sandbox. */
+import {resolveNodeBuiltin} from './node-builtins.js';
+import {packageURLIdentity} from './package-urls.js';
 export interface PackageModule {source:string; sha256:string; imports:Record<string,string>}
 export interface InstalledPackage {name:string; version:string; entry:string; imports:string[]}
 export interface PackageLock {version:1; packages:InstalledPackage[]; modules:Record<string,PackageModule>}
 export const packageBuiltins = ['react','react/jsx-runtime','react/jsx-dev-runtime','remotion'] as const;
-export const packageLimits = {packages:32, modules:128, moduleBytes:512*1024, totalBytes:4*1024*1024};
+export const packageLimits = {packages:32, modules:128, moduleBytes:2*1024*1024, totalBytes:4*1024*1024};
 export function validatePackageGraph(lock:PackageLock) {
   if(lock?.version!==1||!Array.isArray(lock.packages)||!lock.modules||typeof lock.modules!=='object')throw new Error('Invalid package lock');
   const files=Object.entries(lock.modules);let bytes=0;
@@ -14,10 +16,11 @@ export function validatePackageGraph(lock:PackageLock) {
     names.add(pkg.name);
   }
   for(const [url,file]of files){
-    if(!url.startsWith('https://esm.sh/')||typeof file.source!=='string'||!/^([a-f0-9]{64})$/.test(file.sha256)||!file.imports||typeof file.imports!=='object')throw new Error('Invalid package module');
+    packageURLIdentity(url);
+    if(typeof file.source!=='string'||!/^([a-f0-9]{64})$/.test(file.sha256)||!file.imports||typeof file.imports!=='object')throw new Error('Invalid package module');
     const size=new TextEncoder().encode(file.source).length;bytes+=size;
     if(size>packageLimits.moduleBytes||bytes>packageLimits.totalBytes)throw new Error('Package source exceeds limits');
-    for(const target of Object.values(file.imports))if(!packageBuiltins.includes(target as any)&&!Object.hasOwn(lock.modules,target))throw new Error(`Missing locked dependency: ${target}`);
+    for(const target of Object.values(file.imports))if(!packageBuiltins.includes(target as any)&&!resolveNodeBuiltin(target)&&!Object.hasOwn(lock.modules,target))throw new Error(`Missing locked dependency: ${target}`);
   }
 }
 

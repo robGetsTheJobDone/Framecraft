@@ -18,15 +18,20 @@ export function createMusicComposer(options:MusicComposerOptions){
   const model=options.model.withStructuredOutput(composerScoreSchema,{name:'music_score'});
   let correction='';
   for(let attempt=0;attempt<2;attempt++){
-   const output=await model.invoke([new SystemMessage(`${musicSkill.instructions}\nPreset catalog:\n${presetGuide}\n${options.instructions??''}`),new HumanMessage(JSON.stringify({brief,durationSeconds:context.durationSeconds,existing:context.existing??null,correction}))],{signal:context.signal});
-   try{const score=validateScore({...output,renderer:'tone-v1'});if(Math.abs(score.durationSeconds-context.durationSeconds)>.001)throw new Error('Use the exact requested durationSeconds.');return score;}
-   catch(error){if(attempt===1)throw error;correction=error instanceof Error?error.message:String(error);}
+   try{
+    // Structured output can reject the score inside invoke, before validateScore runs.
+    context.signal?.throwIfAborted();
+    const output=await model.invoke([new SystemMessage(`${musicSkill.instructions}\nPreset catalog:\n${presetGuide}\n${options.instructions??''}`),new HumanMessage(JSON.stringify({brief,durationSeconds:context.durationSeconds,existing:context.existing??null,correction}))],{signal:context.signal});
+    context.signal?.throwIfAborted();
+    const score=validateScore({...output,renderer:'tone-v1'});if(Math.abs(score.durationSeconds-context.durationSeconds)>.001)throw new Error('Use the exact requested durationSeconds.');return score;
+   }
+   catch(error){context.signal?.throwIfAborted();if(attempt===1)throw error;correction=error instanceof Error?error.message:String(error);}
   }
   throw new Error('Music composition failed');
  }};
 }
 export interface MusicToolOptions extends MusicComposerOptions {
- durationSeconds:number;signal?:AbortSignal;onProgress?:(message:string)=>void;
+ durationSeconds:number|(()=>number|Promise<number>);signal?:AbortSignal;onProgress?:(message:string)=>void;
  saveFile:(path:string,data:Uint8Array|string)=>Promise<unknown>;
  readFile:(path:string)=>Promise<Uint8Array>;
  /** Import the audio; when replacesId exists, replace that previous soundtrack's clip. */
@@ -36,7 +41,8 @@ export function createMusicTools(options:MusicToolOptions){
  const composer=createMusicComposer(options);
  const generate=async(brief:string,id:string,existing?:MusicScore,replacesId?:string)=>{
   options.signal?.throwIfAborted();options.onProgress?.('Music composer is arranging the soundtrack');
-  const score=await composer.compose(brief,{durationSeconds:options.durationSeconds,existing,signal:options.signal});
+  const durationSeconds=typeof options.durationSeconds==='function'?await options.durationSeconds():options.durationSeconds;
+  const score=await composer.compose(brief,{durationSeconds,existing,signal:options.signal});
   options.onProgress?.('Synthesizing instruments in the browser');
   const audio=await synthesizeMusic(score,{signal:options.signal});options.signal?.throwIfAborted();
   await options.saveFile(`/music/${id}.json`,JSON.stringify(score,null,2));

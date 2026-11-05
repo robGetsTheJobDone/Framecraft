@@ -34,6 +34,32 @@ async function withServer(handler, action) {
   finally {await new Promise(resolve => server.close(resolve));}
 }
 
+test('reference transcription uses server credentials and original-language multipart audio', async () => {
+  const wav = Buffer.alloc(64); wav.write('RIFF'); wav.write('WAVE', 8);
+  const calls = [];
+  await withServer(openAIHandler({OPENAI_API_KEY: 'private-transcription-key'}, async (url, options) => {
+    calls.push({url, options});
+    return Response.json({text: '你好 — مرحبًا', languages: [{code: 'zh'}, {code: 'ar'}]});
+  }), async post => {
+    const response = await post('/api/transcribe', {audio: wav.toString('base64'), previousText: 'Bonjour', model: 'ignored'});
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).text, '你好 — مرحبًا');
+    const {url, options} = calls[0];
+    assert.equal(url, 'https://api.openai.com/v1/audio/transcriptions');
+    assert.equal(options.headers.Authorization, 'Bearer private-transcription-key');
+    assert.equal(options.headers['Content-Type'], undefined);
+    assert.equal(options.body.get('model'), 'gpt-transcribe');
+    assert.equal(options.body.get('prompt'), 'Bonjour');
+    assert.equal(options.body.get('language'), null);
+    assert.equal(options.body.get('file').name, 'reference.wav');
+    assert.deepEqual(Buffer.from(await options.body.get('file').arrayBuffer()), wav);
+    assert.equal((await post('/api/transcribe', {audio: 'bad-base64'})).status, 400);
+    assert.equal((await post('/api/transcribe', {audio: Buffer.from('not wav').toString('base64')})).status, 400);
+    assert.equal((await post('/api/transcribe', {audio: wav.toString('base64'), previousText: 'x'.repeat(401)})).status, 400);
+    assert.equal(calls.length, 1);
+  });
+});
+
 test('Astra Responses preserves tools, strips incompatible sampling, and speech uses Realtime', async () => {
   const calls = [];
   let spoken;

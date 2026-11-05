@@ -6,7 +6,7 @@ import {StudioView} from '@deepbench/studio/view';
 import {Studio, createFileSystemComponentLibrary} from '@deepbench/studio';
 import '@deepbench/studio/styles.css';
 import {loadPierogiAssets, pierogiBrand} from './pierogi';
-import {checkedURL, createProviders, serverImageProvider, type Connection} from './providers';
+import {checkedURL, createProviders, serverImageProvider, serverTranscriptionProvider, type Connection} from './providers';
 const disk = new IndexedDBFileSystem({databaseName: 'deepbench-playground'});
 const componentLibrary = createFileSystemComponentLibrary(new IndexedDBFileSystem({databaseName:'framecraft-brand-library'}), {workspaceId:'local-brand'});
 const sessionCache = new Map<string, Promise<StudioSession>>();
@@ -41,7 +41,7 @@ function App() {
   const [seedError,setSeedError]=useState('');
   useEffect(()=>{let stopped=false;void loadPierogiAssets().then(assets=>{if(!stopped)setSeedAssets(assets);}).catch(error=>{if(!stopped)setSeedError(String(error));});return()=>{stopped=true;};},[]);
   const providers=useMemo(()=>createProviders(connection),[connection]);
-  const adapters=useMemo(()=>({model:providers.model,imageGeneration:serverImageProvider,speech:providers.dubbing.speechProvider,storage:disk}),[providers]);
+  const adapters=useMemo(()=>({model:providers.model,imageGeneration:serverImageProvider,speech:providers.dubbing.speechProvider,storage:disk,reverseEngineering:connection?{model:providers.model,transcription:serverConnection?serverTranscriptionProvider:undefined}:undefined}),[providers,connection,serverConnection]);
   const projectId=conversations.some(c=>c.id===active)?active:conversations[0].id;
   useEffect(()=>{localStorage.setItem('deepbench-conversations',JSON.stringify(conversations));},[conversations]);
   useEffect(()=>{localStorage.setItem('deepbench-active',projectId);},[projectId]);
@@ -50,7 +50,7 @@ function App() {
   const settings=settingsOpen?<div className="modal-backdrop"><section className="modal" role="dialog" aria-modal="true" aria-label="Connection settings"><button className="close-modal" aria-label="Close dialog" onClick={()=>setSettingsOpen(false)}>×</button><Settings current={connection} serverConnection={serverConnection} onSave={value=>{setConnection(value);setSettingsOpen(false);}}/></section></div>:undefined;
   if(new URLSearchParams(location.search).get('mode')!=='timeline' && !seedAssets) return <div role={seedError?'alert':'status'}>{seedError||'Loading Pierogi logo…'}</div>;
   if(new URLSearchParams(location.search).get('mode')!=='timeline') return <Studio onImported={session=>{setConversations(items=>[...items,{id:session.projectId,name:'Imported film'}]);setActive(session.projectId);}} conversations={conversations} onSelectProject={setActive} onNewProject={()=>{const id=crypto.randomUUID();setConversations(items=>[...items,{id,name:`Film ${items.length+1}`}]);setActive(id);}} assets={seedAssets} brand={pierogiBrand} projectId={projectId} initialBrief="Create an editable animated ad from the user's brief." adapters={{...adapters,componentLibrary}} libraryWorkspaceId="local-brand" formats={[{id:'story',width:1080,height:1920},{id:'feed',width:1080,height:1350}]} />;
-  return <StudioView projectId={projectId} loadSession={loadSession} providers={providers} conversations={conversations} onSelectProject={setActive} onNewProject={()=>{const id=crypto.randomUUID();setConversations(items=>[...items,{id,name:`Film ${items.length+1}`}]);setActive(id);}} connectionLabel={connection===serverConnection&&connection?'OpenAI connected':connection?'Connected model':'Demo mode'} demo={!connection} imageGeneration={!!serverConnection} onSettings={()=>setSettingsOpen(true)} settings={settings}/>;
+  return <StudioView projectId={projectId} loadSession={loadSession} providers={providers} reverseEngineering={adapters.reverseEngineering} conversations={conversations} onSelectProject={setActive} onNewProject={()=>{const id=crypto.randomUUID();setConversations(items=>[...items,{id,name:`Film ${items.length+1}`}]);setActive(id);}} connectionLabel={connection===serverConnection&&connection?'OpenAI connected':connection?'Connected model':'Demo mode'} demo={!connection} imageGeneration={!!serverConnection} onSettings={()=>setSettingsOpen(true)} settings={settings}/>;
 }
 function Settings({current, serverConnection, onSave}: {serverConnection: Connection | null; current: Connection | null; onSave(value: Connection | null): void}) {
   const [form, setForm] = useState<Connection>(current ?? {baseURL: 'http://localhost:1234/v1', model: '', token: '', speechURL: ''});

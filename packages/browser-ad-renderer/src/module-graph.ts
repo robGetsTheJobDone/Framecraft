@@ -1,6 +1,7 @@
 import {validatePackageGraph, packageBuiltins, type PackageLock} from './packages.js';
 import type {BuildOptions} from 'esbuild-wasm';
 import {isModulePath, type SceneComposition} from '@deepbench/studio-project';
+import {resolveNodeBuiltin} from './node-builtins.js';
 export const moduleLimits = {files: 256, fileCharacters: 120000, totalCharacters: 2000000};
 /** Includes all sources, so changes to any transitive helper invalidate the cache. */
 export function sceneCompilationKey(modules: Record<string, string>, composition: SceneComposition, packages?:PackageLock): string {
@@ -35,11 +36,13 @@ export function createSceneBuildOptions(modules: Record<string, string>, composi
     build.onResolve({filter: /.*/}, args => {
       if (args.kind === 'dynamic-import') return {errors: [{text: 'Dynamic imports are unsupported in scene modules'}]};
       if (packageBuiltins.includes(args.path as any)) return {path: args.path, external: true};
+      const builtin=resolveNodeBuiltin(args.path);if(builtin)return {path:builtin,external:true};
       if(args.namespace==='package') {
         const imports=packages?.modules[args.importer]?.imports;
         const target=imports&&Object.hasOwn(imports,args.path)?imports[args.path]:undefined;
         if(!target)return {errors:[{text:`Unresolved package dependency: ${args.path}`}]};
-        return packageBuiltins.includes(target as any)?{path:target,external:true}:{path:target,namespace:'package'};
+        const node=resolveNodeBuiltin(target);
+        return packageBuiltins.includes(target as any)||node?{path:node??target,external:true}:{path:target,namespace:'package'};
       }
       const installed=packages?.packages.find(pkg=>pkg.imports.includes(args.path));
       if(installed)return {path:installed.entry,namespace:'package'};

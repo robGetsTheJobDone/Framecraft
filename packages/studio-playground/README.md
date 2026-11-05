@@ -77,3 +77,30 @@ pnpm test:files
 The browser smoke test runs its own Vite instance on port 5174, uses an isolated browser profile, and checks agent edits, uploads, clip controls, exports, persistence, isolation, the dubbing panel, and responsive layout. Install Chromium once with `pnpm exec playwright install chromium`.
 
 For production output, run `pnpm build`, then `pnpm --filter @deepbench/studio-playground preview` (port 4173). Production and development are separate browser origins and therefore separate workspaces. The runtime is currently a large bundle because it includes the agent and media stack; this is a local playground, not a hosting deployment.
+
+## Reference video breakdowns
+
+With `OPENAI_API_KEY` configured, select **Library → Reverse engineer video** and
+upload or drop an MP4 (up to 100 MB / five minutes). `OPENAI_TRANSCRIPTION_MODEL`
+defaults to `gpt-transcribe`. The gateway accepts short base64 WAV chunks at
+`/api/transcribe` and submits multipart audio to the provider using server credentials.
+It returns original-language text and detected language codes; no translation is
+requested. Visual groups use the connected vision model and structured output.
+
+The result includes saved one-second frames, a multilingual transcript with chunk
+ranges, and a cohesive scene/design breakdown. **Use as creative brief** drafts a
+chat request without automatically modifying the timeline. Saved reports reopen from
+the same dialog and are included in session downloads.
+
+Run `pnpm test:reverse-engineering` from the repository root for the browser regression
+check (requires ffmpeg and Playwright Chromium). It generates an MP4 locally, verifies
+frame colors/times and real audio extraction, and uses deterministic AI/transcription
+fixtures. It checks drag/drop, overlapping analysis groups, multilingual text, persistence,
+creative-brief handoff, transcription failure, cancellation, and silent video without
+calling a paid provider.
+
+Use **Trim reference** before analyzing to remove unwanted lead-in or ending footage.
+Start/end sliders and second fields, playhead markers, selection-only playback, and
+reset are available. The browser tests verify that a fractional trim selects the
+correct video colors and audio frequencies, rebases the report to zero, and preserves
+source offsets when saving/reopening.
