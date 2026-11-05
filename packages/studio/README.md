@@ -19,6 +19,21 @@ The workspace, compilation, preview, audio mixing, and video export run in the b
 - **An inspectable workspace:** Monaco file editor, asset previews, activity updates, and optional file watching.
 - **Portable sessions:** IndexedDB storage, session ZIP download/import, checkpoint adapters, and interrupted-run recovery.
 - **Local video export:** MP4 or WebM with progress and cancellation, subject to browser codec support.
+- **Terminal workflow:** the `framecraft` CLI creates, edits, inspects, resumes, and exports disk-backed projects through headless Chromium.
+
+## Command line
+
+```sh
+npm install -g @framecraft/studio
+framecraft setup
+framecraft create ./my-ad --brief "An eight-second animated product launch"
+framecraft edit ./my-ad "Make the headline larger"
+framecraft export ./my-ad --out ./my-ad.mp4
+```
+
+Requires Node 22.22+ and Chromium. Set `OPENAI_API_KEY` in your environment for AI commands. Create without `--brief`, inspect, direct edits, ZIP import/export, and video export work without a model key. Credentials stay in Node; projects and recoverable checkpoints live in `./my-ad/.framecraft`. Use `--json` for scripts and coding agents.
+
+See the [CLI guide](https://github.com/robGetsTheJobDone/Framecraft/blob/v0.5.0/docs/cli.md) for deterministic scene edits, model configuration, project portability, and cancellation.
 
 ## Install
 

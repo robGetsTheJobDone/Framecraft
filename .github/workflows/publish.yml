@@ -38,6 +38,7 @@ jobs:
       - run: node scripts/check-portable.mjs
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm --filter @deepbench/browser-ad-renderer test:browser
+      - run: node scripts/cli-smoke.mjs
       - run: node scripts/component-library-browser-smoke.mjs
       - run: node scripts/scenes-portable-smoke.mjs
       - run: node scripts/zip-portable-smoke.mjs

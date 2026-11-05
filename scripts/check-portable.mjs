@@ -8,11 +8,12 @@ assert.equal(pkg.version, source.version);
 assert.deepEqual(pkg.peerDependencies, source.peerDependencies);
 assert.equal(pkg.private, undefined);
 assert.equal(pkg.publishConfig.access, 'public');
+assert.equal(pkg.bin.framecraft, './cli/main.mjs');
 for (const [name, version] of Object.entries(pkg.dependencies ?? {})) {
   assert.ok(!name.startsWith('@deepbench/'), `Unbundled workspace dependency: ${name}`);
   assert.ok(!/^(workspace:|file:|link:)/.test(version), `Local dependency: ${name}`);
 }
-for (const file of ['index.js', 'index.d.ts', 'node.js', 'node.d.ts', 'styles.css', 'esbuild.wasm', 'monaco-editor.worker.js', 'types/studio/index.d.ts']) await access(new URL(file, root));
+for (const file of ['index.js', 'index.d.ts', 'node.js', 'node.d.ts', 'styles.css', 'esbuild.wasm', 'monaco-editor.worker.js', 'types/studio/index.d.ts', 'cli/main.mjs', 'cli/runtime.js', 'cli/storage.mjs', 'cli/server.mjs']) await access(new URL(file, root));
 const {loadContextFiles} = await import(new URL('node.js', root));
 assert.equal(typeof loadContextFiles, 'function');
 console.log(`Portable ${pkg.name}@${pkg.version} validated`);

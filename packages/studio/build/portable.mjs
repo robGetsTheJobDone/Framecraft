@@ -1,5 +1,5 @@
 import {build} from 'esbuild';
-import {mkdir,readFile,writeFile,copyFile,readdir,rm} from 'node:fs/promises';
+import {mkdir,readFile,writeFile,copyFile,readdir,rm,chmod} from 'node:fs/promises';
 import {resolve} from 'node:path';
 const root=resolve(import.meta.dirname,'../../..');
 process.chdir(root);
@@ -18,6 +18,12 @@ const browserBuild=await build({entryPoints:{index:'packages/studio/src/index.ts
 await writeFile('packages/studio/dist/portable-meta.json',JSON.stringify(browserBuild.metafile));
 // Keep Node filesystem imports isolated behind the optional /node subpath.
 await build({entryPoints:['packages/studio/src/node.ts'],outfile:dir+'/node.js',bundle:true,format:'esm',platform:'node',target:'node22',minify:true,legalComments:'inline'});
+// The terminal runtime includes React and the model adapter; it is independent
+// of the public browser entry and never adds CLI code to an embedded studio.
+await mkdir(dir+'/cli',{recursive:true});
+await build({entryPoints:{runtime:'packages/studio/cli/runtime.ts'},outdir:dir+'/cli',chunkNames:'[name]-[hash]',splitting:true,bundle:true,format:'esm',platform:'browser',target:'es2022',minify:true,keepNames:false,legalComments:'linked',define:{'process.env.NODE_ENV':'"production"'}});
+for(const file of ['main.mjs','storage.mjs','server.mjs'])await copyFile('packages/studio/cli/'+file,dir+'/cli/'+file);
+await chmod(dir+'/cli/main.mjs',0o755);
 // Preserve declaration modules and rewrite workspace references to local files.
 for (let i=0;i<names.length;i++) {
  const name=names[i]; const typeDir=dir+'/types/'+name; await mkdir(typeDir,{recursive:true});
@@ -43,5 +49,5 @@ await copyFile('packages/studio/README.md',dir+'/README.md');
 await writeFile(dir+'/styles.css', (await readFile(dir+'/index.css','utf8')) + '\n' + (await readFile('packages/studio/src/styles.css','utf8')));
 await copyFile('packages/studio/dist/monaco-editor.worker.js',dir+'/monaco-editor.worker.js');
 await copyFile('packages/browser-ad-renderer/dist/esbuild.wasm',dir+'/esbuild.wasm');
-await writeFile(dir+'/package.json',JSON.stringify({name:'@framecraft/studio',version:studioManifest.version,description:'Browser-first AI video studio with editable Remotion ads, music and portable sessions',repository:{type:'git',url:'git+https://github.com/robGetsTheJobDone/Framecraft.git',directory:'packages/studio'},homepage:'https://github.com/robGetsTheJobDone/Framecraft#readme',bugs:{url:'https://github.com/robGetsTheJobDone/Framecraft/issues'},publishConfig:{access:'public'},files:['*.js','*.css','*.d.ts','*.wasm','*.ttf','*.txt','types','README.md'],type:'module',exports:{'.':{types:'./index.d.ts',import:'./index.js'},'./node':{types:'./node.d.ts',import:'./node.js'},'./styles.css':'./styles.css','./esbuild.wasm':'./esbuild.wasm'},sideEffects:['*.css'],peerDependencies:studioManifest.peerDependencies,dependencies},null,2));
+await writeFile(dir+'/package.json',JSON.stringify({name:'@framecraft/studio',version:studioManifest.version,description:'Browser-first AI video studio with editable Remotion ads, music and portable sessions',repository:{type:'git',url:'git+https://github.com/robGetsTheJobDone/Framecraft.git',directory:'packages/studio'},homepage:'https://github.com/robGetsTheJobDone/Framecraft#readme',bugs:{url:'https://github.com/robGetsTheJobDone/Framecraft/issues'},publishConfig:{access:'public'},bin:{framecraft:'./cli/main.mjs'},engines:{node:'>=22.22.0'},files:['cli','*.js','*.css','*.d.ts','*.wasm','*.ttf','*.txt','types','README.md'],type:'module',exports:{'.':{types:'./index.d.ts',import:'./index.js'},'./node':{types:'./node.d.ts',import:'./node.js'},'./styles.css':'./styles.css','./esbuild.wasm':'./esbuild.wasm'},sideEffects:['*.css'],peerDependencies:studioManifest.peerDependencies,dependencies},null,2));
 console.log('Portable package built at '+dir);

@@ -237,9 +237,15 @@ importers:
       '@langchain/core':
         specifier: ^1.2.14
         version: 1.2.20(openai@7.39.0(ws@8.22.0)(zod@4.6.7))(ws@8.22.0)
+      '@langchain/openai':
+        specifier: 1.6.3
+        version: 1.6.3(@langchain/core@1.2.20(openai@7.39.0(ws@8.22.0)(zod@4.6.7))(ws@8.22.0))(ws@8.22.0)
       monaco-editor:
         specifier: ^0.57.0
         version: 0.57.0
+      playwright:
+        specifier: 1.64.1
+        version: 1.64.1
     devDependencies:
       '@types/react':
         specifier: ^19.0.0
